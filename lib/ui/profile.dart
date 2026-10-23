@@ -107,7 +107,7 @@ class _ProfileTabState extends State<ProfileTab> {
         physics: const NeverScrollableScrollPhysics(),
         mainAxisSpacing: 8,
         crossAxisSpacing: 8,
-        childAspectRatio: 1.3,
+        childAspectRatio: 1.05,
         children: [
           stat('Wiek', a != null ? '$a lat' : '–'),
           stat('BMI', bmi != null && !minor ? bmi.toStringAsFixed(1).replaceAll('.', ',') : '–', minor ? 'u dzieci wg siatek' : null),
@@ -124,6 +124,7 @@ class _ProfileTabState extends State<ProfileTab> {
         Expanded(
           child: DropdownButtonFormField<String>(
             value: d.sex,
+            isExpanded: true,
             decoration: dec('Płeć'),
             items: const [DropdownMenuItem(value: '', child: Text('—')), DropdownMenuItem(value: 'k', child: Text('Kobieta')), DropdownMenuItem(value: 'm', child: Text('Mężczyzna'))],
             onChanged: (v) {

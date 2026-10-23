@@ -239,36 +239,34 @@ class _MealFormState extends State<MealForm> {
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 12),
-        Row(children: [
-          Expanded(
-            flex: 3,
-            child: DropdownButtonFormField<String>(
+        DropdownButtonFormField<String>(
               value: type,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'Posiłek'),
               items: [for (final t in mealTypes) DropdownMenuItem(value: t, child: Text(t))],
               onChanged: (v) => setState(() => type = v ?? type),
             ),
-          ),
-          const SizedBox(width: 8),
+        const SizedBox(height: 8),
+        Row(children: [
           Expanded(
-            flex: 2,
-            child: OutlinedButton(
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.event, size: 18),
               onPressed: () async {
                 final d = await showDatePicker(context: context, initialDate: DateTime.parse('${date}T12:00:00'), firstDate: DateTime(2020), lastDate: DateTime.now());
                 if (d != null) setState(() => date = isoDate(d));
               },
-              child: Text(dayLabel(date), overflow: TextOverflow.ellipsis),
+              label: Text(dayLabel(date), overflow: TextOverflow.ellipsis),
             ),
           ),
           const SizedBox(width: 8),
-          OutlinedButton(
+          OutlinedButton.icon(
+            icon: const Icon(Icons.schedule, size: 18),
             onPressed: () async {
               final p = time.split(':');
               final t = await showTimePicker(context: context, initialTime: TimeOfDay(hour: int.tryParse(p[0]) ?? 12, minute: int.tryParse(p.length > 1 ? p[1] : '0') ?? 0));
               if (t != null) setState(() => time = '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}');
             },
-            child: Text(time),
+            label: Text(time),
           ),
         ]),
         const SizedBox(height: 16),
@@ -293,8 +291,11 @@ class _MealFormState extends State<MealForm> {
           decoration: BoxDecoration(color: cs.surfaceContainer, borderRadius: BorderRadius.circular(12)),
           child: Row(children: [
             Text('Razem', style: TextStyle(color: cs.onSurfaceVariant)),
-            const Spacer(),
-            Text('${total.kcal.round()} kcal · B ${total.p.round()} · W ${total.c.round()} · T ${total.f.round()}', style: const TextStyle(fontWeight: FontWeight.w700, fontFeatures: tabular)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text('${total.kcal.round()} kcal · B ${total.p.round()} · W ${total.c.round()} · T ${total.f.round()}',
+                  textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w700, fontFeatures: tabular)),
+            ),
           ]),
         ),
       ]),

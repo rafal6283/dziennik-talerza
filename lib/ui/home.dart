@@ -197,8 +197,7 @@ class _BudgetCard extends StatelessWidget {
         Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Text('${t.kcal.round()}', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w800, height: 1, fontFeatures: tabular)),
           const SizedBox(width: 8),
-          Padding(padding: const EdgeInsets.only(bottom: 4), child: Text('z $goal kcal', style: TextStyle(color: cs.onSurfaceVariant))),
-          const Spacer(),
+          Expanded(child: Padding(padding: const EdgeInsets.only(bottom: 4), child: Text('z $goal kcal', overflow: TextOverflow.ellipsis, style: TextStyle(color: cs.onSurfaceVariant)))),
           Padding(
             padding: const EdgeInsets.only(bottom: 4),
             child: Text(left >= 0 ? 'zostało ${left.round()}' : '${(-left).round()} ponad cel',
@@ -235,8 +234,7 @@ class _GutCard extends StatelessWidget {
     return Panel(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          Text('Trawienie', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-          const Spacer(),
+          Expanded(child: Text('Trawienie', overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700))),
           IconButton(tooltip: 'Powiedz, jak się czujesz', icon: const Icon(Icons.mic_none), onPressed: () => open(voice: true)),
           TextButton.icon(onPressed: () => open(), icon: const Icon(Icons.add), label: const Text('Wpis')),
         ]),
