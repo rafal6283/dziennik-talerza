@@ -40,7 +40,7 @@ void main() {
 
     await t.tap(find.text('Wzorce'));
     await t.pumpAndSettle();
-    expect(find.text('Kalorie · ostatnie 7 dni'), findsOneWidget);
+    expect(find.text('Kalorie dzień po dniu'), findsOneWidget);
 
     await t.tap(find.text('Profil'));
     await t.pumpAndSettle();
