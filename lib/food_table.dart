@@ -204,7 +204,7 @@ chipsy;540;6.5;50;35;30;garść
 paluszki słone|paluszki;380;10;75;4;30;garść
 popcorn;450;9;55;22;30;garść
 miód;305;0.3;82;0;10;łyżeczka
-cukier;400;0;100;0;5;łyżeczka
+cukier|cukru|cukrem;400;0;100;0;5;łyżeczka
 dżem|konfitura;220;0.4;54;0.1;15;łyżka
 krem czekoladowy|nutella;540;6;57;31;15;łyżka
 żelki;340;6;77;0.2;25;garść
@@ -255,6 +255,167 @@ ketchup;105;1.2;24;0.2;15;łyżka
 musztarda;100;6;6;5;10;łyżeczka
 sos czosnkowy;300;1.5;6;30;30;porcja
 odżywka białkowa|białko serwatkowe|whey;380;75;8;6;30;miarka
+ptasie mleczko;430;3.5;63;18;10;sztuka
+delicje szampańskie|delicje;370;3.5;67;10;12;ciastko
+krówki|krówka;410;2.5;80;9;8;cukierek
+michałki|michałek;520;6;57;29;10;cukierek
+cukierki czekoladowe|praliny|czekoladki;500;5;58;27;10;sztuka
+cukierki|landrynki|cukierki twarde;390;0;97;0;5;cukierek
+lizak;390;0;98;0;10;lizak
+dropsy|draże;390;0;96;0.5;10;porcja
+marcepan;450;7;60;20;20;kawałek
+chałwa;520;12;55;29;30;kawałek
+pierniki|piernik;380;6;72;7;25;sztuka
+pierniki w czekoladzie;400;5;68;12;25;sztuka
+kremówka|napoleonka;320;4;30;20;120;kawałek
+eklerka|ptyś;330;5;30;21;60;sztuka
+babka|babka piaskowa;400;6;52;19;60;kawałek
+makowiec;370;7;50;15;80;kawałek
+faworki|chrust;480;7;55;26;30;porcja
+tiramisu;290;5;28;17;120;porcja
+brownie;450;6;55;23;60;kawałek
+muffinka|muffin;400;5.5;52;19;80;sztuka
+gofr|gofry;290;7;38;12;80;gofr
+gofr z bitą śmietaną;320;5;38;16;150;gofr
+rurki z kremem|rurka z kremem;480;4.5;50;29;40;sztuka
+wafle|wafle przekładane;520;6;62;28;20;wafel
+grześki;515;6;61;27;34;baton
+princessa;520;6;60;28;34;baton
+knoppers;545;8.5;51;34;25;sztuka
+kinder bueno;570;8.6;50;37;22;batonik
+kinder czekoladka;560;8.7;53;35;13;batonik
+kit kat|kitkat;520;7;61;27;42;baton
+mars;450;4;70;17;51;baton
+twix;495;4.5;65;24;50;baton
+bounty;485;3.7;58;26;57;baton
+lion;485;5;66;21;42;baton
+oreo|ciastka oreo;475;5;69;20;11;ciastko
+petitki|herbatniki maślane;440;8;74;12;6;ciastko
+markizy|ciastka z kremem;490;5;67;22;14;ciastko
+ciastka owsiane;460;6.5;65;19;15;ciastko
+batonik musli|baton zbożowy;400;6;65;12;25;baton
+baton proteinowy;370;30;35;12;50;baton
+budyń;100;3;16;2.5;250;kubek
+kisiel;65;0;16;0;250;kubek
+galaretka;60;1.5;13;0;150;porcja
+ryż na mleku|ryż z mlekiem;110;3.5;18;2.5;300;miska
+serek homogenizowany waniliowy|serek homogenizowany;160;7;16;7.5;150;kubek
+danio|serek waniliowy;140;7;18;4.5;140;kubek
+jogurt pitny;75;3;12;1.5;250;butelka
+mleko czekoladowe;80;3.2;12;2;250;kubek
+gorąca czekolada;90;3;13;3;250;kubek
+lody na patyku|lody w polewie;290;3.5;28;18;70;sztuka
+sorbet;130;0.5;32;0.2;100;gałka
+bita śmietana;260;2.5;12;22;20;porcja
+krem czekoladowo-orzechowy;540;6;57;31;15;łyżka
+syrop klonowy;260;0;67;0;15;łyżka
+ksylitol;240;0;100;0;5;łyżeczka
+krakersy;480;9;65;20;25;garść
+chrupki kukurydziane;500;7;68;22;20;garść
+prażynki;520;3;60;30;30;garść
+nachos|tortilla chips;500;7;62;24;40;garść
+orzeszki w posypce|orzeszki w skorupce smakowej;520;17;35;35;30;garść
+pistacje;570;20;18;46;30;garść
+orzechy brazylijskie;660;14;5;67;20;garść
+sezam;575;18;12;50;10;łyżka
+bułka maślana;330;8.5;55;8;60;bułka
+croissant z czekoladą;430;7;48;23;70;sztuka
+bajgiel;270;10;52;1.5;90;sztuka
+pita|chlebek pita;275;9;55;1.2;60;sztuka
+bułka tarta;370;12;75;2;10;łyżka
+chleb bezglutenowy;250;3;45;6;35;kromka
+otręby owsiane|otręby;250;17;45;7;15;łyżka
+płatki jaglane;360;11;71;3;40;porcja
+hot dog;270;10;28;13;120;sztuka
+nuggetsy|nuggetsy z kurczaka;280;15;17;17;100;porcja (6 szt.)
+kurczak w panierce|kotlet z kurczaka panierowany;250;18;12;14;150;porcja
+skrzydełka|skrzydełka z kurczaka;240;20;3;17;150;porcja
+kotlet de volaille|de volaille;270;17;12;17;180;kotlet
+gyros;210;18;4;14;200;porcja
+kebab w tortilli|tortilla z kebabem;230;11;22;11;350;sztuka
+tortilla z kurczakiem|wrap z kurczakiem;200;11;20;8;250;sztuka
+pizza pepperoni|pizza z salami;290;12;32;13;110;kawałek
+pizza hawajska;250;11;32;9;110;kawałek
+shake|milkshake;120;3.5;19;3.5;300;kubek
+fasolka po bretońsku;120;7;12;5;300;porcja
+placki z jabłkami|racuchy;240;5;35;9;150;porcja
+pierogi leniwe|leniwe;190;9;27;5;250;porcja
+pyzy|kluski na parze;190;5;38;2;150;porcja
+naleśniki z serem;200;9;24;8;150;porcja (2 szt.)
+naleśniki z dżemem;230;5;38;7;150;porcja (2 szt.)
+omlet;155;10.5;1.5;12;150;porcja
+jajecznica na boczku;250;13;1;21;150;porcja
+jajka faszerowane;180;10;2;15;60;połówka
+kanapka z serem;270;11;27;13;60;kanapka
+kanapka z jajkiem;210;9;24;8.5;60;kanapka
+kanapka z pastą jajeczną;240;8;23;13;60;kanapka
+owsianka z owocami;105;3.5;17;2.5;300;miska
+risotto;150;4;22;5;300;porcja
+curry z kurczakiem;140;11;6;8;300;porcja
+chili con carne;110;8;9;4.5;300;porcja
+sałatka cezar;150;8;7;10;250;porcja
+sałatka z tuńczykiem;120;10;5;7;250;porcja
+śledź w śmietanie;190;10;4;15;100;porcja
+ryba po grecku;140;10;7;8;150;porcja
+krokiety;220;9;22;11;150;sztuka
+paszteciki;320;8;32;18;80;sztuka
+zupa grzybowa|grzybowa;45;1.3;5;2.2;350;talerz
+flaki|flaczki;75;8;3;3.5;350;talerz
+kasza z gulaszem;140;8;16;5;350;porcja
+schab w sosie;160;16;4;9;200;porcja
+kotlet z indyka;180;24;5;7;150;kotlet
+kiełbaski z grilla|kiełbaska;290;13;2;26;100;sztuka
+wątróbka drobiowa;140;19;1;6.5;120;porcja
+filet z mintaja|mintaj;80;17;0;1;150;porcja
+pstrąg;150;21;0;7;150;porcja
+sardynki w oleju|sardynki;210;24;0;12.5;90;puszka
+paluszki krabowe|surimi;95;7.5;15;0.5;60;porcja
+halloumi;320;22;2;25;50;porcja
+mascarpone;430;5;4;44;20;łyżka
+ricotta;150;10;3.5;11;50;porcja
+ser pleśniowy|lazur;350;21;0.5;29;30;porcja
+twarożek ze szczypiorkiem|pasta twarogowa;140;12;4;8;50;porcja
+napój migdałowy|mleko migdałowe;25;0.5;3;1.2;250;szklanka
+mleko kokosowe;180;2;3;18;50;porcja
+seler|seler korzeniowy;21;1.5;2.5;0.3;100;porcja
+por;31;1.5;4.5;0.3;80;porcja
+rukola;25;2.6;2;0.7;30;garść
+kalarepa;27;1.7;4;0.1;100;porcja
+dynia;26;1;5.5;0.1;150;porcja
+batat|słodki ziemniak;86;1.6;17;0.1;150;porcja
+szparagi;20;2.2;2;0.1;100;porcja
+oliwki;145;1;2;15;30;garść
+papryka konserwowa;30;1;6;0.2;50;porcja
+pomidory suszone;210;5;12;15;20;porcja
+kiełki;30;3;3;0.5;20;garść
+czereśnie;63;1.1;14;0.2;150;garść
+wiśnie;50;1;11;0.3;150;garść
+porzeczki;45;1.2;8;0.3;100;garść
+agrest;44;0.9;8;0.6;100;garść
+grejpfrut;42;0.8;9;0.1;250;sztuka
+nektarynka;44;1.1;9;0.3;140;sztuka
+morela;48;1.4;10;0.4;40;sztuka
+figa;74;0.8;16;0.3;50;sztuka
+granat;83;1.7;15;1.2;100;porcja
+melon;34;0.8;8;0.2;200;kawałek
+borówka amerykańska;57;0.7;12;0.3;100;garść
+mus owocowy|przecier owocowy;55;0.4;12;0.1;100;tubka
+napój energetyczny|energetyk;45;0;11;0;250;puszka
+napój pomarańczowy|oranżada;40;0;10;0;330;szklanka
+kompot;35;0.1;9;0;250;szklanka
+sok marchwiowy;40;0.5;9;0.1;250;szklanka
+smoothie;55;0.8;12;0.3;300;butelka
+piwo smakowe|radler;40;0.3;8;0;500;butelka
+cydr;45;0;5;0;330;butelka
+whisky;250;0;0;0;40;kieliszek
+nalewka|likier;300;0;30;0;30;kieliszek
+sos pomidorowy;50;1.5;8;1.2;100;porcja
+pesto;450;5;5;45;20;łyżka
+sos sojowy;55;8;5;0;15;łyżka
+sos bbq;160;1;38;0.5;20;łyżka
+sos tatarski;390;1.5;6;40;20;łyżka
+chrzan;60;1.5;8;2;10;łyżeczka
+sól;0;0;0;0;1;szczypta
 ''';
 
 List<FoodRef>? _cache;
@@ -304,7 +465,7 @@ class FoodIndex {
     return FoodIndex(refs);
   }
 
-  static int _score(FoodRef r, String q, List<String> qWords) {
+  static int _score(FoodRef r, String q, List<String> qWords, List<String> qStems) {
     var best = 0;
     for (final n in [r.name, ...r.aliases]) {
       final t = normalizeFood(n);
@@ -315,9 +476,28 @@ class FoodIndex {
         s = 80;
       } else {
         final words = t.split(' ');
-        // każde słowo zapytania musi zaczynać jakieś słowo nazwy
-        if (!qWords.every((w) => words.any((x) => x.startsWith(w)))) continue;
-        s = 60;
+        final stems = words.map(stemFood).toList();
+        // każde słowo zapytania (także w innej formie: „chleba żytniego”) musi zaczynać jakieś słowo nazwy
+        var ok = true;
+        var exactStems = 0;
+        for (var k = 0; k < qWords.length; k++) {
+          final w = qWords[k], st = qStems[k];
+          if (_stop.contains(w)) continue;
+          var hit = false;
+          for (var m = 0; m < words.length; m++) {
+            if (words[m].startsWith(w) || stems[m].startsWith(st)) {
+              hit = true;
+              if (stems[m] == st) exactStems++;
+              break;
+            }
+          }
+          if (!hit) {
+            ok = false;
+            break;
+          }
+        }
+        if (!ok) continue;
+        s = 60 + (exactStems * 5 > 15 ? 15 : exactStems * 5);
       }
       if (n != r.name) s -= 5;
       if (s > best) best = s;
@@ -330,22 +510,225 @@ class FoodIndex {
     final q = normalizeFood(query);
     if (q.length < 2) return const [];
     final qWords = q.split(' ');
+    final qStems = qWords.map(stemFood).toList();
     final scored = <(FoodRef, int)>[
       for (final r in refs)
-        if (_score(r, q, qWords) case final s when s > 0) (r, s)
+        if (_score(r, q, qWords, qStems) case final s when s > 0) (r, s)
     ]..sort((a, b) => b.$2 != a.$2 ? b.$2.compareTo(a.$2) : a.$1.name.length.compareTo(b.$1.name.length));
     return scored.take(limit).map((e) => e.$1).toList();
   }
 
-  /// Dokładne dopasowanie nazwy (do uzupełnienia wartości po rozpoznaniu AI).
+  /// Dopasowanie nazwy z dokładnością do odmiany (do uzupełnienia wartości po rozpoznaniu AI).
   FoodRef? exact(String name) {
     final q = normalizeFood(name);
+    final qs = stemPhrase(name);
+    FoodRef? byStem;
     for (final r in refs) {
       if (normalizeFood(r.name) == q || r.aliases.any((a) => normalizeFood(a) == q)) return r;
+      if (byStem == null && qs.isNotEmpty && [r.name, ...r.aliases].any((n) => _sameList(stemPhrase(n), qs))) byStem = r;
     }
-    return null;
+    return byStem;
   }
 }
 
 /// Nazwy z tabeli do podpowiedzi dla modelu AI.
 String tableNamesForPrompt() => foodTable().map((r) => r.name).join(', ');
+
+
+// ---------- odmiana słów i rozpisywanie opisu ----------
+
+const _stop = {'z', 'ze', 'i', 'oraz', 'na', 'w', 'we', 'do', 'bez', 'a', 'albo', 'lub', 'po', 'od', 'dla', 'plus', 'troche', 'jakies', 'jakis', 'sobie', 'zjadlem', 'zjadlam', 'jem', 'pije', 'wypilem', 'wypilam', 'mialem', 'mialam', 'bylo', 'byl', 'byla', 'to', 'tez', 'jeszcze', 'potem'};
+const _suffixes = ['owego', 'owych', 'owej', 'iego', 'owym', 'iami', 'ych', 'ich', 'ami', 'ach', 'owi', 'ego', 'emu', 'ymi', 'imi', 'iem', 'ow', 'om', 'em', 'ie', 'ia', 'y', 'i', 'a', 'o', 'u', 'e'];
+
+bool _sameList(List<String> a, List<String> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
+}
+
+/// Prosty „rdzeń” polskiego słowa (po normalizacji): chleba → chleb, żytniego → zytn, jajek → jajk.
+String stemFood(String word) {
+  var w = normalizeFood(word);
+  if (w.length <= 3 || RegExp(r'^\d').hasMatch(w)) return w;
+  // ruchome „e”: jajek, kromek, bułek → jajk, kromk, bulk
+  if (w.length > 4 && w.endsWith('ek')) return '${w.substring(0, w.length - 2)}k';
+  for (final suf in _suffixes) {
+    if (w.endsWith(suf) && w.length - suf.length >= 3) return w.substring(0, w.length - suf.length);
+  }
+  return w;
+}
+
+/// Rdzenie słów nazwy bez słów pomocniczych („pierś z kurczaka” → [piers, kurczak]).
+List<String> stemPhrase(String s) =>
+    normalizeFood(s).split(' ').where((w) => w.isNotEmpty && !_stop.contains(w)).map(stemFood).toList();
+
+class ParsedFood {
+  final FoodRef ref;
+  final double grams;
+  final String text; // fragment opisu
+  const ParsedFood(this.ref, this.grams, this.text);
+  FoodItem get item => ref.item(grams);
+}
+
+class ParsedDescription {
+  final List<ParsedFood> items;
+  final List<String> unknown; // fragmenty bez dopasowania
+  const ParsedDescription(this.items, this.unknown);
+}
+
+const _numberWords = {
+  'pol': 0.5, 'polowa': 0.5, 'polowe': 0.5, 'poltora': 1.5, 'poltorej': 1.5,
+  'jeden': 1, 'jedna': 1, 'jedno': 1, 'jednej': 1,
+  'dwa': 2, 'dwie': 2, 'dwoch': 2, 'dwiema': 2, 'pare': 2, 'para': 2,
+  'trzy': 3, 'trzech': 3, 'kilka': 3, 'cztery': 4, 'czterech': 4, 'piec': 5, 'pieciu': 5, 'szesc': 6, 'siedem': 7, 'osiem': 8, 'dziesiec': 10,
+};
+
+/// Jednostki: rdzeń → gramy na jednostkę (null = porcja z tabeli).
+const _units = <String, double?>{
+  'g': 1, 'gr': 1, 'gram': 1, 'dag': 10, 'deko': 10, 'kg': 1000, 'kilo': 1000, 'ml': 1, 'l': 1000, 'litr': 1000,
+  'kromk': 35, 'kromecz': 30, 'plaster': 15, 'plasterk': 15, 'lyzk': 15, 'lyzeczk': 5, 'szklank': 250, 'kubek': 250, 'kubk': 250,
+  'garsc': 30, 'garstk': 20, 'misk': 300, 'miseczk': 150, 'talerz': 350, 'puszk': null, 'opakowan': null, 'paczk': null,
+  'porcj': null, 'sztuk': null, 'szt': null, 'kawalek': null, 'kawalk': null, 'filizank': 150, 'kieliszek': null, 'kieliszk': null,
+  'butelk': 500, 'kostk': 5, 'tabliczk': 100, 'galk': 60, 'szczypt': 1, 'plastr': 15,
+};
+
+double? _unitGrams(String unitStem, FoodRef r) {
+  final label = stemPhrase(r.portionLabel);
+  if (label.isNotEmpty && (label.first == unitStem || label.first.startsWith(unitStem) || unitStem.startsWith(label.first))) return r.portion;
+  if (!_units.containsKey(unitStem)) return null;
+  return _units[unitStem] ?? r.portion;
+}
+
+/// Rozpisuje opis (pisany albo podyktowany) na produkty z tabeli i historii, z ilościami.
+/// „2 kromki chleba żytniego z masłem i szynką, kawa z mlekiem” → chleb żytni 70 g, masło 5 g, szynka 15 g, kawa z mlekiem 250 g.
+ParsedDescription parseDescription(String text, FoodIndex index) {
+  // tokeny: słowa, liczby, separatory
+  final tokens = <({String raw, String norm, String stem, bool sep, double? num})>[];
+  // „200g” → „200 g”; przecinek i kropka między cyframi zostają (1,5 kg), poza tym oddzielają produkty
+  final cleaned = text
+      .replaceAllMapped(RegExp(r'(\d)([^\d\s.,/%])'), (m) => '${m[1]} ${m[2]}')
+      .replaceAll(RegExp(r'[;+\n]|,(?!\d)|\.(?!\d)'), ' | ');
+  for (final part in cleaned.split(RegExp(r'\s+'))) {
+    final raw = part.trim();
+    if (raw.isEmpty) continue;
+    if (raw == '|') {
+      tokens.add((raw: raw, norm: '', stem: '', sep: true, num: null));
+      continue;
+    }
+    final n = normalizeFood(raw);
+    if (n.isEmpty) continue;
+    double? num;
+    if (RegExp(r'^\d+([.,]\d+)?$').hasMatch(n)) num = double.tryParse(n.replaceAll(',', '.'));
+    if (RegExp(r'^\d+/\d+$').hasMatch(raw)) {
+      final f = raw.split('/');
+      num = double.parse(f[0]) / double.parse(f[1]);
+    }
+    num ??= _numberWords[n]?.toDouble();
+    tokens.add((raw: raw, norm: n, stem: stemFood(n), sep: false, num: num));
+  }
+
+  // kandydaci: rdzenie nazw i synonimów
+  final cands = <(FoodRef, List<String>, bool)>[
+    for (final r in index.refs)
+      for (final (k, n) in [r.name, ...r.aliases].indexed)
+        if (stemPhrase(n) case final st when st.isNotEmpty) (r, st, k == 0)
+  ];
+
+  bool isUnit(String stem) => _units.containsKey(stem);
+
+  final items = <ParsedFood>[];
+  final unknown = <String>[];
+  final unk = <String>[];
+  void flushUnknown() {
+    if (unk.isNotEmpty) unknown.add(unk.join(' '));
+    unk.clear();
+  }
+
+  double? qty;
+  String? unit;
+  var i = 0;
+  while (i < tokens.length) {
+    final t = tokens[i];
+    if (t.sep) {
+      flushUnknown();
+      qty = null;
+      unit = null;
+      i++;
+      continue;
+    }
+    if (t.num != null) {
+      flushUnknown();
+      qty = (qty != null && t.num == 0.5) ? qty + 0.5 : t.num; // „dwie i pół” → 2,5
+      i++;
+      continue;
+    }
+    if (isUnit(t.stem) && (qty != null || t.stem != 'g')) {
+      flushUnknown();
+      unit = t.stem;
+      i++;
+      continue;
+    }
+    if (_stop.contains(t.norm)) {
+      i++;
+      continue;
+    }
+    // najdłuższe dopasowanie nazwy od pozycji i (słowa pomocnicze w środku są pomijane)
+    (FoodRef, int, int)? best; // ref, liczba słów nazwy, pozycja końca
+    for (final (r, st, primary) in cands) {
+      var j = i, k = 0;
+      while (k < st.length && j < tokens.length) {
+        final tj = tokens[j];
+        if (tj.sep) break;
+        if (_stop.contains(tj.norm) && k > 0) {
+          j++;
+          continue;
+        }
+        if (tj.stem == st[k] || (st[k].length >= 4 && tj.stem.startsWith(st[k])) || (tj.stem.length >= 4 && st[k].startsWith(tj.stem))) {
+          k++;
+          j++;
+        } else {
+          break;
+        }
+      }
+      if (k == st.length) {
+        final score = st.length * 10 + (r.mine ? 3 : 0) + (primary ? 1 : 0);
+        if (best == null || score > best.$2) best = (r, score, j);
+      }
+    }
+    if (best == null) {
+      unk.add(t.raw);
+      i++;
+      continue;
+    }
+    flushUnknown();
+    final r = best.$1;
+    var end = best.$3;
+    // ilość po nazwie: „ryż 150 g”, „chleb 2 kromki”
+    if (qty == null && end < tokens.length && tokens[end].num != null) {
+      final after = end + 1 < tokens.length ? tokens[end + 1] : null;
+      if (after == null || after.sep || isUnit(after.stem)) {
+        qty = tokens[end].num;
+        end++;
+        if (after != null && !after.sep && isUnit(after.stem)) {
+          unit = after.stem;
+          end++;
+        }
+      }
+    }
+    double grams;
+    if (unit != null) {
+      final ug = _unitGrams(unit, r) ?? r.portion;
+      grams = (qty ?? 1) * ug;
+    } else {
+      grams = (qty ?? 1) * r.portion;
+    }
+    items.add(ParsedFood(r, grams, tokens.sublist(i, end).where((x) => !x.sep).map((x) => x.raw).join(' ')));
+    qty = null;
+    unit = null;
+    i = end;
+  }
+  flushUnknown();
+  return ParsedDescription(items, unknown.where((u) => u.trim().length > 1).toList());
+}

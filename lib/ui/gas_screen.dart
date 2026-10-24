@@ -36,6 +36,10 @@ class _GasScreenState extends State<GasScreen> {
           final g = parseNightExchange(person.id, text);
           await app.setGas(g);
           if (mounted) toast(context, 'Nocny Licznik → ${person.name}: ${g.windows.length} nocy, ${g.events.length} wiatrów');
+        case GasFileKind.kreskaJson:
+          final g = parseKreskaExchange(person.id, text);
+          await app.setGas(g);
+          if (mounted) toast(context, 'Kreska („${g.label}”) → ${person.name}: ${g.events.length} wpisów z godziną, ${g.days.length} dni');
         case GasFileKind.kreska:
           final counters = parseKreskaCsv(text);
           if (counters.isEmpty) {
@@ -105,6 +109,7 @@ class _GasScreenState extends State<GasScreen> {
                   title: Text(g.source == gasKreska ? 'Kreska · licznik „${g.label}”' : 'Nocny Licznik'),
                   subtitle: Text(g.source == gasKreska
                       ? '${g.from != null ? '${dayLabel(g.from!)} – ${dayLabel(g.to!)}' : 'brak dni'} · razem ${g.days.values.fold<int>(0, (a, b) => a + b)}'
+                          '${g.events.isNotEmpty ? ' · z godzinami' : ' · tylko sumy dni (CSV)'}'
                       : '${g.windows.length} nocy · ${g.events.length} wiatrów'),
                   trailing: IconButton(
                     tooltip: 'Usuń te dane',
@@ -131,7 +136,8 @@ class _GasScreenState extends State<GasScreen> {
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.exposure_plus_1),
               title: const Text('Kreska'),
-              subtitle: const Text('Raporty → Eksportuj CSV (najlepiej „rok”). Zapisz plik albo udostępnij go do Plików, potem wczytaj tutaj i wybierz licznik z wiatrami (np. FF).'),
+              subtitle: const Text('Raporty → „Eksportuj wpisy z godzinami (JSON)” i wybierz licznik z wiatrami (np. FF) – wtedy wiatry liczą się od godziny posiłku. '
+                  'Starszy eksport CSV też działa, ale daje tylko sumy dni.'),
             ),
             ListTile(
               contentPadding: EdgeInsets.zero,
@@ -141,7 +147,7 @@ class _GasScreenState extends State<GasScreen> {
             ),
             const SizedBox(height: 8),
             Text('Pliki zawierają całą historię, więc ponowne wczytanie zastępuje poprzednie dane z danej aplikacji. '
-                'Kreska podaje dzienne sumy (bez godzin), Nocny Licznik – godziny wiatrów w nagrywanych nocach.',
+                'Kreska JSON i Nocny Licznik podają godziny wiatrów, Kreska CSV – tylko sumy dni.',
                 style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12.5)),
           ]),
         );

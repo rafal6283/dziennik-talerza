@@ -1,5 +1,5 @@
 // Wiatry z innych aplikacji użytkownika:
-// - Kreska: eksport CSV (typ;nazwa;data;wartość;…) – dzienne sumy licznika, np. „FF”, wpisywane w ciągu dnia,
+// - Kreska: eksport JSON „wymiana-zdarzen” (każde kliknięcie z godziną) albo starszy CSV (typ;nazwa;data;wartość;…) – tylko sumy dni,
 // - Nocny Licznik: plik „wymiana-zdarzen” v1 (JSON) – noce z nagraniem i godziny wykrytych wiatrów.
 // Każdy plik zawiera całą historię źródła, więc ponowny import zastępuje poprzedni.
 
@@ -19,7 +19,7 @@ class GasSource {
   final Map<String, int> days; // Kreska: data → liczba
   final String? from, to; // zakres dni pokrytych przez plik Kreski
   final List<(int, int)> windows; // Nocny Licznik: noce (ms)
-  final List<int> events; // Nocny Licznik: wiatry (ms), bez odrzuconych
+  final List<int> events; // wiatry z godziną (ms): Nocny Licznik bez odrzuconych, Kreska z eksportu JSON
 
   GasSource({
     required this.person,
@@ -73,7 +73,7 @@ class GasSource {
 
 // ---------- rozpoznanie i odczyt plików ----------
 
-enum GasFileKind { kreska, night, unknown }
+enum GasFileKind { kreska, kreskaJson, night, unknown }
 
 GasFileKind detectGasFile(String text) {
   final t = text.replaceFirst('﻿', '').trimLeft();
@@ -82,6 +82,7 @@ GasFileKind detectGasFile(String text) {
     try {
       final j = jsonDecode(t);
       if (j is Map && j['format'] == 'wymiana-zdarzen' && j['source'] == gasNight) return GasFileKind.night;
+      if (j is Map && j['format'] == 'wymiana-zdarzen' && j['source'] == gasKreska) return GasFileKind.kreskaJson;
     } catch (_) {}
   }
   return GasFileKind.unknown;
@@ -153,6 +154,41 @@ GasSource kreskaSource(String person, String counter, Map<String, int> days, {St
   return GasSource(person: person, source: gasKreska, label: counter, days: days, from: keys.isEmpty ? null : keys.first, to: to.isEmpty ? null : to.last);
 }
 
+/// Kreska JSON („Eksportuj wpisy z godzinami”) → kliknięcia z godziną i sumy dni.
+GasSource parseKreskaExchange(String person, String text) {
+  final j = jsonDecode(text.replaceFirst('\uFEFF', ''));
+  if (j is! Map || j['format'] != 'wymiana-zdarzen' || j['source'] != gasKreska) {
+    throw const FormatException('To nie jest plik eksportu z Kreski');
+  }
+  if (j['version'] != 1) throw const FormatException('Nieobsługiwana wersja pliku z Kreski');
+  final days = <String, int>{
+    for (final d in (j['day_totals'] is List ? j['day_totals'] as List : const []))
+      if (d is Map && d['date'] is String && d['total'] is num) d['date'] as String: (d['total'] as num).toInt()
+  };
+  final events = <int>[
+    for (final e in (j['events'] is List ? j['events'] as List : const []))
+      if (e is Map && e['start'] is num) (e['start'] as num).toInt()
+  ]..sort();
+  String? from;
+  final ws = j['windows'] is List ? j['windows'] as List : const [];
+  if (ws.isNotEmpty && ws.first is Map && (ws.first as Map)['start'] is num) {
+    from = isoDate(DateTime.fromMillisecondsSinceEpoch(((ws.first as Map)['start'] as num).toInt()));
+  }
+  final keys = days.keys.toList()..sort();
+  from ??= keys.isEmpty ? null : keys.first;
+  final exported = j['exported_at'] is num ? isoDate(DateTime.fromMillisecondsSinceEpoch((j['exported_at'] as num).toInt())) : null;
+  final to = [if (keys.isNotEmpty) keys.last, if (exported != null) exported]..sort();
+  return GasSource(
+    person: person,
+    source: gasKreska,
+    label: '${j['counter'] ?? 'licznik'}',
+    days: days,
+    from: from,
+    to: to.isEmpty ? null : to.last,
+    events: events,
+  );
+}
+
 /// Nocny Licznik → noce i wiatry (bez odrzuconych przez użytkownika).
 GasSource parseNightExchange(String person, String text) {
   final j = jsonDecode(text.replaceFirst('﻿', ''));
@@ -217,14 +253,31 @@ class GasSeries {
   /// Wiatry w nocy po danym dniu z Nocnego Licznika, null gdy tej nocy nie nagrywano.
   int? nightAfter(String date) => _nights[date];
 
-  /// Skutek jedzenia z dnia D: noc po D + następny dzień (reakcje bywają opóźnione o 6–30 h).
-  int? outcome(String date) {
-    final n = nightAfter(date), d = day(shiftDay(date, 1));
+  /// Kreska z godzinami (eksport JSON).
+  bool get kreskaTimed => (kreska?.events.isNotEmpty ?? false);
+
+  /// Kliknięcia z Kreski od [fromMs] do końca następnego dnia po [date]; null poza zakresem pliku.
+  int? kreskaAfter(String date, int fromMs) {
+    final k = kreska;
+    final next = shiftDay(date, 1);
+    if (k == null || day(date) == null || day(next) == null) return null;
+    final end = DateTime.parse('${shiftDay(next, 1)}T00:00:00').millisecondsSinceEpoch;
+    return k.events.where((t) => t >= fromMs && t < end).length;
+  }
+
+  /// Skutek jedzenia z dnia D: noc po D + Kreska. Z godzinami: od 2 h po pierwszym posiłku dnia do końca
+  /// następnego dnia; bez godzin: cały następny dzień (reakcje bywają opóźnione o 6–30 h).
+  int? outcome(String date, {int? firstMealMs}) {
+    final n = nightAfter(date);
+    final d = kreskaTimed && firstMealMs != null ? kreskaAfter(date, firstMealMs + 2 * 3600 * 1000) : day(shiftDay(date, 1));
     if (n == null && d == null) return null;
     return (n ?? 0) + (d ?? 0);
   }
 
-  String get outcomeLabel => [if (night != null) 'noc po dniu jedzenia', if (kreska != null) 'następny dzień'].join(' + ');
+  String get outcomeLabel => [
+        if (night != null) 'noc po dniu jedzenia',
+        if (kreska != null) kreskaTimed ? 'Kreska od 2 h po pierwszym posiłku do końca następnego dnia' : 'Kreska: następny dzień',
+      ].join(' + ');
 }
 
 class GasAssoc {
@@ -245,12 +298,15 @@ class GasAssocResult {
 
 GasAssocResult gasAssociations(List<Meal> meals, GasSeries s, {int top = 8}) {
   final byDay = <String, Set<String>>{};
+  final firstMeal = <String, int>{};
   for (final m in meals) {
     byDay.putIfAbsent(m.date, () => {}).addAll(ingredientsOf([m]));
+    final t = m.ts;
+    if (!firstMeal.containsKey(m.date) || t < firstMeal[m.date]!) firstMeal[m.date] = t;
   }
   final outcomes = <String, int>{
     for (final d in byDay.keys)
-      if (s.outcome(d) case final o?) d: o
+      if (s.outcome(d, firstMealMs: firstMeal[d]) case final o?) d: o
   };
   if (outcomes.isEmpty) return const GasAssocResult(0, 0, []);
   final base = avg(outcomes.values);

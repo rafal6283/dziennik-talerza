@@ -198,6 +198,61 @@ void main() {
     });
   });
 
+  group('opis → składniki', () {
+    final idx = FoodIndex.build(const []);
+    List<(String, int)> parse(String t) => [for (final p in parseDescription(t, idx).items) (p.ref.name, p.grams.round())];
+
+    test('odmiana i ilości', () {
+      expect(stemFood('chleba'), stemFood('chleb'));
+      expect(stemFood('żytniego'), stemFood('żytni'));
+      expect(stemFood('jajek'), stemFood('jajka'));
+      expect(stemFood('masłem'), stemFood('masło'));
+      expect(stemFood('ziemniaków'), stemFood('ziemniak'));
+      expect(parse('dwie kromki chleba żytniego z masłem i szynką'), [('chleb żytni', 70), ('masło', 5), ('szynka', 15)]);
+      expect(parse('2 jajka sadzone, kawa z mlekiem'), [('jajko sadzone', 120), ('kawa z mlekiem', 250)]);
+      expect(parse('ryż 150 g, pierś z kurczaka grillowana 120g i surówka z marchewki'),
+          [('ryż biały ugotowany', 150), ('pierś z kurczaka pieczona', 120), ('surówka z marchewki', 100)]);
+      expect(parse('pół banana i 1,5 szklanki kefiru'), [('banan', 60), ('kefir', 375)]);
+      expect(parse('3 ptasie mleczka'), [('ptasie mleczko', 30)]);
+    });
+
+    test('nieznane fragmenty', () {
+      final r = parseDescription('zupa z kosmosu, jabłko', idx);
+      expect(r.items.map((p) => p.ref.name), ['jabłko']);
+      expect(r.unknown, isNotEmpty);
+    });
+
+    test('wyszukiwanie w odmianie', () {
+      expect(idx.search('chleba żytniego').first.name, 'chleb żytni');
+      expect(idx.search('piersi z kurczaka').map((x) => x.name), contains('pierś z kurczaka pieczona'));
+      expect(idx.exact('Jajka sadzone')!.name, 'jajko sadzone');
+      expect(idx.search('kinder').map((x) => x.name), contains('kinder bueno'));
+    });
+  });
+
+  test('Kreska JSON z godzinami', () {
+    int ms(String s) => DateTime.parse(s).millisecondsSinceEpoch;
+    final json = '{"format":"wymiana-zdarzen","version":1,"source":"kreska","exported_at":${ms('2026-10-23T09:00:00')},"counter":"FF",'
+        '"windows":[{"start":${ms('2026-10-20T00:00:00')},"end":${ms('2026-10-23T09:00:00')}}],'
+        '"events":[{"id":"k1-0","type":"tap","start":${ms('2026-10-20T10:00:00')}},{"id":"k2-0","type":"tap","start":${ms('2026-10-20T21:00:00')}},'
+        '{"id":"k3-0","type":"tap","start":${ms('2026-10-21T15:00:00')}}],'
+        '"day_totals":[{"date":"2026-10-20","total":2},{"date":"2026-10-21","total":4}]}';
+    expect(detectGasFile(json), GasFileKind.kreskaJson);
+    final g = parseKreskaExchange('me', json);
+    expect(g.label, 'FF');
+    expect(g.events.length, 3);
+    expect(g.from, '2026-10-20');
+    expect(g.to, '2026-10-23');
+    final s = GasSeries([g]);
+    expect(s.kreskaTimed, isTrue);
+    expect(s.day('2026-10-21'), 4);
+    // śniadanie 8:00 → liczymy od 10:00 do końca następnego dnia: 10:00, 21:00, 15:00 nast. dnia
+    expect(s.outcome('2026-10-20', firstMealMs: ms('2026-10-20T08:00:00')), 3);
+    // obiad 14:00 → od 16:00: 21:00 i 15:00 następnego dnia
+    expect(s.outcome('2026-10-20', firstMealMs: ms('2026-10-20T14:00:00')), 2);
+    expect(s.outcome('2026-10-20'), 4); // bez godziny posiłku: suma następnego dnia
+  });
+
   test('produkt z Open Food Facts', () {
     final p = FoodDb.parse('5900000000000', {
       'status': 1,

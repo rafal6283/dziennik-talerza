@@ -199,7 +199,7 @@ class Ai {
     ], maxTokens: 10, keyOverride: k);
   }
 
-  static Future<MealGuess> recognizeMeal({List<int>? jpeg, String desc = '', FoodIndex? index}) async {
+  static Future<MealGuess> recognizeMeal({List<int>? jpeg, String desc = '', FoodIndex? index, String? draft}) async {
     final d = desc.trim();
     if (jpeg == null && d.isEmpty) throw const AiError('Dodaj zdjęcie albo opis posiłku.');
     final photo = jpeg != null;
@@ -208,6 +208,7 @@ ${photo ? 'Masz zdjęcie posiłku.' : 'Nie ma zdjęcia, jest tylko opis.'}
 ${d.isNotEmpty ? 'Opis od użytkownika (mógł być podyktowany głosem): "$d"' : 'Użytkownik nie dodał opisu.'}
 ${d.isNotEmpty && photo ? 'Zasady: opis jest najważniejszy – produkty, ilości (sztuki, łyżki, kromki, gramy) i sposób przygotowania z opisu traktuj jako fakty. Zdjęcie służy do oszacowania wielkości porcji tego, czego ilości opis nie podaje, i do wychwycenia widocznych dodatków (sos, masło, posypka). Nie zmieniaj produktów z opisu na inne podobne.' : ''}
 ${d.isNotEmpty && !photo ? 'Zasady: produkty i ilości z opisu traktuj jako fakty; gdy ilości brak, przyjmij typową porcję w Polsce.' : ''}
+${draft != null ? 'Wstępne rozpisanie opisu z tabeli produktów (popraw ilości i dodaj, czego brakuje, ale nie usuwaj produktów z opisu): $draft' : ''}
 ${d.isEmpty ? 'Rozpoznaj składniki na zdjęciu i oszacuj gramatury po wielkości talerza i sztućców (porcje typowe dla Polski).' : ''}
 Gramatury podawaj dla produktów w postaci zjedzonej (np. ugotowany ryż, pieczone mięso). Gdy składnik pasuje do jednej z tych nazw, użyj dokładnie tej nazwy: ${tableNamesForPrompt()}.
 Odpowiedz wyłącznie JSON-em, nazwy po polsku, liczby bez jednostek:

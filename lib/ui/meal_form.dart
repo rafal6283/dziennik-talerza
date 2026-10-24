@@ -269,7 +269,37 @@ class _MealFormState extends State<MealForm> {
     final cur = desc.text.trim();
     desc.text = cur.isEmpty ? t : '$cur $t';
     setState(() {});
-    if (aiOn) await _recognize();
+    if (aiOn) {
+      await _recognize();
+    } else {
+      _fromDescription();
+    }
+  }
+
+  /// Rozpisuje opis na składniki z tabeli i historii – bez AI i bez internetu.
+  void _fromDescription() {
+    final d = desc.text.trim();
+    if (d.isEmpty) {
+      _status('Najpierw wpisz albo podyktuj, co jesz.', err: true);
+      return;
+    }
+    final r = parseDescription(d, index);
+    if (r.items.isEmpty) {
+      _status('Nie znalazłem tych produktów w bazie. Dodaj składniki ręcznie${aiOn ? ' albo użyj „Rozpoznaj”' : ''}.', err: true);
+      return;
+    }
+    setState(() {
+      final old = items.where((c) => c.name.text.trim().isEmpty).toList();
+      items.removeWhere(old.contains);
+      _disposeLater(old);
+      for (final p in r.items) {
+        items.add(_ItemCtl(p.item)..ref = p.ref..per100 = Macros(p.ref.kcal, p.ref.protein, p.ref.carbs, p.ref.fat));
+      }
+      if (name.text.trim().isEmpty) name.text = d.length > 60 ? '${d.substring(0, 57)}…' : d[0].toUpperCase() + d.substring(1);
+    });
+    final n = r.items.length;
+    _status('Rozpisano: $n ${n == 1 ? 'składnik' : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) ? 'składniki' : 'składników'}.'
+        '${r.unknown.isNotEmpty ? ' Nie znaleziono: ${r.unknown.map((u) => '„$u”').join(', ')} – dodaj je ręcznie.' : ' Sprawdź ilości.'}');
   }
 
   Future<void> _recognize() async {
@@ -281,7 +311,13 @@ class _MealFormState extends State<MealForm> {
     setState(() => busy = true);
     _status(aiLocal ? 'Model na telefonie analizuje posiłek… (to może potrwać do minuty)' : 'Claude analizuje posiłek…');
     try {
-      final g = await Ai.recognizeMeal(jpeg: newPhoto, desc: desc.text, index: index);
+      final draft = desc.text.trim().isEmpty ? null : parseDescription(desc.text, index);
+      final g = await Ai.recognizeMeal(
+        jpeg: newPhoto,
+        desc: desc.text,
+        index: index,
+        draft: draft == null || draft.items.isEmpty ? null : draft.items.map((p) => '${p.ref.name} ${p.grams.round()} g').join(', '),
+      );
       _disposeLater([...items]);
       items
         ..clear()
@@ -381,6 +417,15 @@ class _MealFormState extends State<MealForm> {
           ),
           onChanged: (_) => setState(() {}),
         ),
+        if (desc.text.trim().isNotEmpty)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: busy ? null : _fromDescription,
+              icon: const Icon(Icons.format_list_bulleted, size: 18),
+              label: const Text('Rozpisz opis na składniki (bez AI)'),
+            ),
+          ),
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(
               value: type,
