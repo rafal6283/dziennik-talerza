@@ -14,6 +14,7 @@ Prywatna aplikacja na Androida i iPhone'a (Flutter): co jem, ile to kalorii i ja
 - **Trawienie** jako osobne wpisy (też następnego dnia): pora, komfort 1–5, objawy z nasileniem, skala bristolska, podejrzane posiłki. Rano przypomnienie o ocenie po wczorajszych posiłkach.
 - **Dyktowanie głosem** w opisie posiłku, notatkach, ocenie po posiłku i wpisie o trawieniu. Z modelem AI powiedziane zdanie samo wypełnia formularz (objawy, nasilenie, komfort, energia).
 - **Wzorce**: kalorie z 7 dni względem celu, pasek trawienia z 14 dni, częstość objawów, składniki przed gorszym trawieniem (okno 30 h albo zaznaczone posiłki), objawy po posiłkach, energia wg pory posiłku, analiza Claude uwzględniająca profil osoby.
+- **Wiatry z Kreski i Nocnego Licznika** (opcjonalnie): import eksportu CSV z Kreski (dzienne sumy licznika, np. FF) i pliku wiatrów z Nocnego Licznika (noce i godziny). Dziennik pokazuje wiatry danego dnia, Wzorce – wykres 14 dni i składniki, po których jest ich więcej (noc po dniu jedzenia + następny dzień), a analiza AI bierze je pod uwagę.
 - **Kopia zapasowa** w pliku `.json` (import scala po id). Import przyjmuje też eksport z wersji przeglądarkowej, razem z miniaturami zdjęć.
 - **Logowanie** opcjonalne, domyślnie wyłączone: PIN, wzór, blokada ekranu telefonu, biometria.
 
@@ -33,6 +34,7 @@ Rozpoznawanie AI: **Ustawienia → Rozpoznawanie AI → Na telefonie – darmowe
 - `lib/ai.dart` – rozpoznawanie posiłków, uzupełnianie z dyktowania, analiza (wybór: model na telefonie albo API Anthropic)
 - `lib/local_ai.dart` – Gemma 4 na telefonie (flutter_edge_ai + LiteRT-LM)
 - `lib/food_db.dart` – Open Food Facts
+- `lib/gas.dart` – import i analiza wiatrów (Kreska CSV, Nocny Licznik „wymiana-zdarzen” v1)
 - `lib/store.dart` – stan, zapis do pliku, zdjęcia, import/eksport
 - `lib/ui/` – ekrany; `voice.dart` – dyktowanie
 

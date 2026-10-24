@@ -9,6 +9,7 @@ import '../local_ai.dart';
 import '../main.dart';
 import '../security/lock.dart';
 import 'format.dart';
+import 'gas_screen.dart';
 import 'model_screen.dart';
 import 'security_screen.dart';
 
@@ -222,6 +223,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 : 'Produkty paczkowane najdokładniej dodasz skanerem kodów kreskowych (darmowa baza Open Food Facts) – przycisk „Kod” w formularzu posiłku.',
             style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12.5),
           ),
+        ),
+        const SectionTitle('Inne aplikacje'),
+        ListTile(
+          leading: const Icon(Icons.air),
+          title: const Text('Wiatry z Kreski i Nocnego Licznika'),
+          subtitle: Text(() {
+            final n = app.gasSources.where((g) => g.person == app.active.id).map((g) => g.sourceLabel).toList();
+            return n.isEmpty ? 'Opcjonalnie – nic nie zaimportowano' : 'Dla „${app.active.name}”: ${n.join(', ')}';
+          }()),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () async {
+            await Navigator.push(context, MaterialPageRoute(builder: (_) => const GasScreen()));
+            if (mounted) setState(() {});
+          },
         ),
         const SectionTitle('Dane'),
         ListTile(

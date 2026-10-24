@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'calc.dart';
+import 'gas.dart';
 import 'models.dart';
 
 class ImportSummary {
@@ -21,6 +22,7 @@ class AppState extends ChangeNotifier {
   String activeId = 'me';
   List<Meal> allMeals = [];
   List<GutEntry> allGut = [];
+  List<GasSource> gasSources = [];
   bool loaded = false;
 
   Directory? _dir;
@@ -60,6 +62,7 @@ class AppState extends ChangeNotifier {
   List<Meal> mealsOn(String date) => meals.where((m) => m.date == date).toList();
   List<GutEntry> gutOn(String date) => gut.where((g) => g.date == date).toList();
   int get goal => goalOf(active);
+  GasSeries get gasSeries => GasSeries(gasSources.where((g) => g.person == active.id));
 
   // ---------- wczytanie i zapis ----------
 
@@ -82,6 +85,7 @@ class AppState extends ChangeNotifier {
         'people': people.map((p) => p.toJson()).toList(),
         'meals': allMeals.map((m) => m.toJson()).toList(),
         'gut': allGut.map((g) => g.toJson()).toList(),
+        if (gasSources.isNotEmpty) 'gasSources': gasSources.map((g) => g.toJson()).toList(),
       };
 
   Future<void> _save() async {
@@ -107,6 +111,11 @@ class AppState extends ChangeNotifier {
     final ng = [for (final e in (rawG is List ? rawG : const [])) if (e is Map) GutEntry.fromJson(Map<String, dynamic>.from(e))]
         .where((g) => g.date.length == 10)
         .toList();
+    final ngas = [for (final e in (j['gasSources'] is List ? j['gasSources'] as List : const [])) if (e is Map) GasSource.fromJson(Map<String, dynamic>.from(e))];
+    for (final g in ngas) {
+      gasSources.removeWhere((x) => x.id == g.id);
+      gasSources.add(g);
+    }
     var added = 0, updated = 0;
     if (replace) {
       if (np.isNotEmpty) people = np;
@@ -208,6 +217,7 @@ class AppState extends ChangeNotifier {
     }
     allMeals.removeWhere((m) => m.person == id);
     allGut.removeWhere((g) => g.person == id);
+    gasSources.removeWhere((g) => g.person == id);
     people.removeWhere((p) => p.id == id);
     if (activeId == id) activeId = people.first.id;
     await _commit();
@@ -245,6 +255,19 @@ class AppState extends ChangeNotifier {
   Future<void> deleteReaction(String mealId, int index) async {
     final m = allMeals.firstWhere((x) => x.id == mealId);
     if (index >= 0 && index < m.reactions.length) m.reactions.removeAt(index);
+    await _commit();
+  }
+
+  // ---------- wiatry z Kreski i Nocnego Licznika ----------
+
+  Future<void> setGas(GasSource g) async {
+    gasSources.removeWhere((x) => x.id == g.id);
+    gasSources.add(g);
+    await _commit();
+  }
+
+  Future<void> deleteGas(String id) async {
+    gasSources.removeWhere((x) => x.id == id);
     await _commit();
   }
 

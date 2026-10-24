@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'calc.dart';
 import 'food_table.dart';
+import 'gas.dart';
 import 'local_ai.dart';
 import 'models.dart';
 
@@ -290,7 +291,7 @@ Odpowiedz wyłącznie JSON-em: {"energy":3,"satiety":4,"symptoms":["senność"],
     return 'Posiłki:\n${cut(lines, mealChars)}\n\nWpisy o trawieniu (często z rana, dotyczą posiłków z poprzedniego dnia; reakcje bywają opóźnione o 6–30 godzin):\n${gl.isEmpty ? 'brak' : cut(gl, gutChars)}';
   }
 
-  static Future<String> analyze(Person p, List<Meal> meals, List<GutEntry> gut) async {
+  static Future<String> analyze(Person p, List<Meal> meals, List<GutEntry> gut, {GasSeries? gas}) async {
     // model na telefonie ma małe okno kontekstu (4096 tokenów) – dostaje 14 dni i skrócony dziennik
     final local = await isLocal();
     final days = local ? 14 : 30;
@@ -299,10 +300,10 @@ Odpowiedz wyłącznie JSON-em: {"energy":3,"satiety":4,"symptoms":["senność"],
 Dane osoby: ${personLine(p)}.
 Uwzględnij wiek, płeć, masę ciała, aktywność, cel i uwagi przy ocenie kalorii, białka i objawów (np. inne potrzeby nastolatka, osoby starszej, kobiety i mężczyzny; nietolerancje z uwag). Jeśli danych osoby brakuje, napisz, które warto uzupełnić. Zwracaj się bezpośrednio do tej osoby.
 
-${local ? journalText(p, meals, gut, since, mealChars: 5200, gutChars: 1800) : journalText(p, meals, gut, since)}
+${local ? journalText(p, meals, gut, since, mealChars: 5200, gutChars: 1800) : journalText(p, meals, gut, since)}${gas != null && gas.any ? '\n\nLiczba wiatrów z aplikacji użytkownika (Kreska – ręczne wpisy w ciągu dnia, Nocny Licznik – wykryte w nocy). Traktuj je jako miarę skutków jedzenia z poprzednich 6–30 godzin:\n${() { final g = gasLines(gas!, since, todayIso()); return local && g.length > 900 ? g.substring(g.length - 900) : g; }()}' : ''}
 
 Przeanalizuj to po polsku, zwięźle (maks. ok. ${local ? 200 : 300} słów), zwykłym tekstem bez nagłówków markdown i bez gwiazdek:
-1. 2–4 najwyraźniejsze zależności między jedzeniem a samopoczuciem i trawieniem (także opóźnione, z dnia na dzień), z liczbą przypadków, na których się opierasz.
+1. 2–4 najwyraźniejsze zależności między jedzeniem a samopoczuciem i trawieniem (także opóźnione, z dnia na dzień)${gas != null && gas.any ? ', w tym z liczbą wiatrów' : ''}, z liczbą przypadków, na których się opierasz.
 2. Co widać w kaloriach i makroskładnikach względem celu tej osoby (regularność, pory, białko).
 3. 2–3 konkretne rzeczy do przetestowania w kolejnych tygodniach.
 Zaznacz, gdzie danych jest za mało na wniosek. Nie stawiaj diagnoz; przy powtarzających się objawach trawiennych zasugeruj konsultację z lekarzem.''';

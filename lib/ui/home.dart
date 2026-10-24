@@ -260,6 +260,25 @@ class _GutCard extends StatelessWidget {
             child: Text('Brak wpisów tego dnia. Dodaj wpis, gdy coś Ci dolega albo rano po kolacji.', style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13)),
           ),
         for (final g in entries) _GutTile(entry: g, onEdit: () => open(e: g)),
+        Builder(builder: (context) {
+          final s = app.gasSeries;
+          if (!s.any) return const SizedBox.shrink();
+          final dd = s.day(day), nb = s.nightAfter(shiftDay(day, -1)), na = s.nightAfter(day);
+          final parts = [
+            if (nb != null) 'noc przed: $nb',
+            if (dd != null) 'w ciągu dnia: $dd',
+            if (na != null) 'noc po: $na',
+          ];
+          if (parts.isEmpty) return const SizedBox.shrink();
+          return Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Row(children: [
+              Icon(Icons.air, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              const SizedBox(width: 8),
+              Expanded(child: Text('Wiatry · ${parts.join(' · ')}', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13))),
+            ]),
+          );
+        }),
       ]),
     );
   }

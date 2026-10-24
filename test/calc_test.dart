@@ -6,6 +6,7 @@ import 'package:dziennik_talerza/ai.dart';
 import 'package:dziennik_talerza/calc.dart';
 import 'package:dziennik_talerza/food_db.dart';
 import 'package:dziennik_talerza/food_table.dart';
+import 'package:dziennik_talerza/gas.dart';
 import 'package:dziennik_talerza/models.dart';
 import 'package:dziennik_talerza/store.dart';
 
@@ -141,6 +142,60 @@ void main() {
     final it = egg.item(120);
     expect(it.kcal, closeTo(168, 0.01));
     expect(normalizeFood('Żółć, ŁÓDŹ!'), 'zolc, lodz');
+  });
+
+  group('wiatry', () {
+    const csv = '\uFEFFtyp;nazwa;data;wartość;początek;koniec;czas_min;pauzy_min;notatka\r\n'
+        'licznik;"FF";2026-10-20;5;;;;;\r\n'
+        'licznik;"FF";2026-10-22;12;;;;;\r\n'
+        'licznik;"Woda";2026-10-22;8;;;;;\r\n'
+        'zdarzenie;"AF";2026-10-21;;2026-10-21 10:00;2026-10-21 10:30;30;0;"x; \"y\""\r\n';
+
+    test('Kreska CSV', () {
+      expect(detectGasFile(csv), GasFileKind.kreska);
+      final c = parseKreskaCsv(csv);
+      expect(c.keys, unorderedEquals(['FF', 'Woda']));
+      expect(guessGasCounter(c.keys), 'FF');
+      final g = kreskaSource('me', 'FF', c['FF']!, fileDate: '2026-10-23');
+      expect(g.from, '2026-10-20');
+      expect(g.to, '2026-10-23');
+      final s = GasSeries([g]);
+      expect(s.day('2026-10-21'), 0); // w zakresie, bez wpisu
+      expect(s.day('2026-10-22'), 12);
+      expect(s.day('2026-10-19'), isNull);
+      expect(s.outcome('2026-10-21'), 12); // następny dzień
+      final back = GasSource.fromJson(g.toJson());
+      expect(back.days['2026-10-22'], 12);
+    });
+
+    test('Nocny Licznik i ocena po dniach', () {
+      int ms(String s) => DateTime.parse(s).millisecondsSinceEpoch;
+      final json = '{"format":"wymiana-zdarzen","version":1,"source":"nocny-licznik","exported_at":0,'
+          '"windows":[{"start":${ms('2026-10-20T23:10:00')},"end":${ms('2026-10-21T06:50:00')}},'
+          '{"start":${ms('2026-10-22T00:30:00')},"end":${ms('2026-10-22T07:00:00')}}],'
+          '"events":[{"id":"a","type":"fart","start":${ms('2026-10-21T02:00:00')},"verified":null},'
+          '{"id":"b","type":"fart","start":${ms('2026-10-21T03:00:00')},"verified":true},'
+          '{"id":"c","type":"fart","start":${ms('2026-10-21T04:00:00')},"verified":false},'
+          '{"id":"d","type":"fart","start":${ms('2026-10-22T05:00:00')}}]}';
+      expect(detectGasFile(json), GasFileKind.night);
+      final n = parseNightExchange('me', json);
+      expect(n.events.length, 3); // odrzucony nie liczy się
+      final s = GasSeries([n]);
+      expect(s.nightAfter('2026-10-20'), 2);
+      expect(s.nightAfter('2026-10-21'), 1); // zasypianie po północy liczy się do poprzedniego dnia
+      expect(s.nightAfter('2026-10-22'), isNull);
+      expect(GasSource.fromJson(n.toJson()).windows.length, 2);
+
+      final meals = [
+        meal('a', '2026-10-20', '19:00', ['fasola', 'chleb']),
+        meal('b', '2026-10-21', '19:00', ['chleb']),
+      ];
+      final r = gasAssociations(meals, s);
+      expect(r.days, 2);
+      expect(r.base, 1.5);
+      expect(r.rows.single.ingredient, 'chleb'); // fasola tylko 1 dzień
+      expect(gasLines(s, '2026-10-19', '2026-10-23'), contains('2026-10-20: w nocy po tym dniu 2'));
+    });
   });
 
   test('produkt z Open Food Facts', () {

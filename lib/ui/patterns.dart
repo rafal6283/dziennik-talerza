@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../ai.dart';
 import '../calc.dart';
+import '../gas.dart';
 import '../main.dart';
 import 'format.dart';
 
@@ -28,7 +29,7 @@ class _PatternsTabState extends State<PatternsTab> {
       err = null;
     });
     try {
-      final t = await Ai.analyze(p, app.meals, app.gut);
+      final t = await Ai.analyze(p, app.meals, app.gut, gas: app.gasSeries);
       setState(() => _ai[p.id] = t);
     } on AiError catch (e) {
       setState(() => err = e.message);
@@ -66,6 +67,8 @@ class _PatternsTabState extends State<PatternsTab> {
     final ra = reactionAssociations(meals);
     final rated = meals.where((m) => m.reactions.isNotEmpty).length;
     final en = energyByType(meals);
+    final gs = app.gasSeries;
+    final gasA = gasAssociations(meals, gs);
 
     return ListView(padding: const EdgeInsets.only(top: 6, bottom: 32), children: [
       Panel(
@@ -182,6 +185,66 @@ class _PatternsTabState extends State<PatternsTab> {
             ],
         ]),
       ),
+      if (gs.any)
+        Panel(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            title('Wiatry'),
+            muted([
+              if (gs.kreska != null) 'Kreska: licznik „${gs.kreska!.label}” (w ciągu dnia)',
+              if (gs.night != null) 'Nocny Licznik (w nocy)',
+            ].join(' · ')),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 120,
+              child: Builder(builder: (context) {
+                final ds = [for (var i = 13; i >= 0; i--) shiftDay(today, -i)];
+                final dayV = [for (final d in ds) gs.day(d)];
+                final nightV = [for (final d in ds) gs.nightAfter(d)];
+                final mx = [1, for (var i = 0; i < 14; i++) (dayV[i] ?? 0) + (nightV[i] ?? 0)].reduce((a, b) => a > b ? a : b).toDouble();
+                return Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  for (var i = 0; i < 14; i++)
+                    Expanded(
+                      child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
+                        Text(dayV[i] == null && nightV[i] == null ? '–' : '${(dayV[i] ?? 0) + (nightV[i] ?? 0)}',
+                            style: TextStyle(fontSize: 9.5, color: cs.onSurfaceVariant, fontFeatures: tabular)),
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 2),
+                          height: 70 * (nightV[i] ?? 0) / mx,
+                          color: cs.tertiary,
+                        ),
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 2),
+                          height: 70 * (dayV[i] ?? 0) / mx + 1,
+                          decoration: BoxDecoration(color: Palette.amber(context), borderRadius: const BorderRadius.vertical(bottom: Radius.circular(2))),
+                        ),
+                        SizedBox(height: 16, child: Center(child: Text('${dayOfMonth(ds[i])}', style: TextStyle(fontSize: 9.5, color: cs.onSurfaceVariant)))),
+                      ]),
+                    ),
+                ]);
+              }),
+            ),
+            Wrap(spacing: 12, children: [
+              if (gs.kreska != null)
+                Row(mainAxisSize: MainAxisSize.min, children: [Container(width: 10, height: 10, color: Palette.amber(context)), const SizedBox(width: 4), muted('dzień')]),
+              if (gs.night != null)
+                Row(mainAxisSize: MainAxisSize.min, children: [Container(width: 10, height: 10, color: cs.tertiary), const SizedBox(width: 4), muted('noc po tym dniu')]),
+            ]),
+            const SizedBox(height: 14),
+            Text('Po czym więcej wiatrów', style: const TextStyle(fontWeight: FontWeight.w600)),
+            muted('Średnia liczba wiatrów (${gs.outcomeLabel}) po dniach, w które jadłeś dany składnik, wobec średniej ze wszystkich dni.'),
+            const SizedBox(height: 6),
+            if (gasA.days < 5)
+              muted('Potrzeba co najmniej 5 dni z posiłkami i danymi o wiatrach. Masz: ${gasA.days}.')
+            else ...[
+              Text('Średnio ${gasA.base.toStringAsFixed(1).replaceAll('.', ',')} po dniu (${gasA.days} dni).', style: const TextStyle(fontWeight: FontWeight.w600)),
+              for (final r in gasA.rows)
+                assocRow(r.ingredient, (gasA.ratio(r) / 2).clamp(0, 1).toDouble(),
+                    '${r.avg.toStringAsFixed(1).replaceAll('.', ',')} · ${r.days} dni', gasA.flagged(r) ? Palette.bad(context) : Palette.amber(context),
+                    flag: gasA.flagged(r)),
+              if (gasA.rows.any(gasA.flagged)) Padding(padding: const EdgeInsets.only(top: 6), child: muted('⚑ co najmniej 30% więcej niż średnio, przy co najmniej 3 dniach.')),
+            ],
+          ]),
+        ),
       Panel(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           title('Energia po jedzeniu'),
