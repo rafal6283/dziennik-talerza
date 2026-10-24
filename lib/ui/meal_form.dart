@@ -5,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 
 import '../ai.dart';
 import '../calc.dart';
+import '../food_db.dart';
+import '../food_pack.dart';
 import '../food_table.dart';
 import '../main.dart';
 import '../models.dart';
@@ -74,7 +76,7 @@ class _ItemCtl {
 
   void apply(FoodRef r) {
     ref = r;
-    name.text = r.name;
+    name.text = r.display;
     per100 = Macros(r.kcal, r.protein, r.carbs, r.fat);
     if (g <= 0) grams.text = numInput(r.portion);
     gramsChanged();
@@ -114,7 +116,7 @@ class _MealFormState extends State<MealForm> {
   final desc = TextEditingController();
   final name = TextEditingController();
   final items = <_ItemCtl>[];
-  late final FoodIndex index = FoodIndex.build(app.allMeals);
+  late FoodIndex index = FoodIndex.build(app.allMeals, pack: FoodPack.cached ?? const []);
   late String date;
   late String time;
   late String type;
@@ -143,6 +145,11 @@ class _MealFormState extends State<MealForm> {
         items.add(_ItemCtl(i));
       }
       photoName = widget.meal?.photo;
+    }
+    if (FoodPack.cached == null) {
+      FoodPack.load().then((p) {
+        if (mounted) setState(() => index = FoodIndex.build(app.allMeals, pack: p));
+      });
     }
     Future.wait([Ai.enabled(), Ai.isLocal(), Ai.setupHint()]).then((r) {
       if (mounted) {
@@ -496,6 +503,54 @@ class _MealFormState extends State<MealForm> {
     );
   }
 
+  /// Wyszukiwanie produktu po nazwie w Open Food Facts (online) – zwraca wybrany produkt.
+  Future<FoodRef?> _searchOnline(String query) => showModalBottomSheet<FoodRef>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (c) => SizedBox(
+          height: MediaQuery.of(c).size.height * 0.7,
+          child: FutureBuilder<List<Product>>(
+            future: FoodDb.search(query),
+            builder: (c, snap) {
+              final cs = Theme.of(c).colorScheme;
+              Widget body;
+              if (snap.connectionState != ConnectionState.done) {
+                body = const Center(child: CircularProgressIndicator());
+              } else if (snap.hasError) {
+                body = Center(child: Padding(padding: const EdgeInsets.all(24), child: Text('${snap.error}', textAlign: TextAlign.center, style: TextStyle(color: cs.error))));
+              } else if ((snap.data ?? const []).isEmpty) {
+                body = Center(child: Padding(padding: const EdgeInsets.all(24), child: Text('Nic nie znaleziono dla „$query”. Spróbuj innej nazwy albo dodaj wartości ręcznie.', textAlign: TextAlign.center)));
+              } else {
+                body = ListView(children: [
+                  for (final p in snap.data!)
+                    ListTile(
+                      title: Text(p.label),
+                      subtitle: Text('${p.kcal100.round()} kcal · B ${p.protein100.toStringAsFixed(1)} · W ${p.carbs100.toStringAsFixed(1)} · T ${p.fat100.toStringAsFixed(1)} na 100 g',
+                          style: const TextStyle(fontFeatures: tabular)),
+                      onTap: () => Navigator.pop(
+                        c,
+                        FoodRef(p.name, const [], p.kcal100, p.protein100, p.carbs100, p.fat100, p.serving ?? 100, p.serving != null ? 'porcja' : '100 g',
+                            brand: p.brand, packaged: true),
+                      ),
+                    ),
+                ]);
+              }
+              return Column(children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: Row(children: [
+                    Expanded(child: Text('Open Food Facts: „$query”', style: Theme.of(c).textTheme.titleMedium)),
+                  ]),
+                ),
+                Expanded(child: body),
+                Padding(padding: const EdgeInsets.all(8), child: Text('Dane: Open Food Facts (ODbL)', style: TextStyle(fontSize: 11.5, color: cs.onSurfaceVariant))),
+              ]);
+            },
+          ),
+        ),
+      );
+
   /// Kontrolery zwalniamy po klatce, gdy pola już zniknęły z ekranu.
   void _disposeLater(Iterable<_ItemCtl> xs) {
     final list = xs.toList();
@@ -541,9 +596,23 @@ class _MealFormState extends State<MealForm> {
             child: RawAutocomplete<FoodRef>(
               textEditingController: c.name,
               focusNode: c.focus,
-              displayStringForOption: (o) => o.name,
-              optionsBuilder: (v) => index.search(v.text),
-              onSelected: (o) => setState(() => c.apply(o)),
+              displayStringForOption: (o) => o.searchOnline ? o.name : o.display,
+              optionsBuilder: (v) {
+                final q = v.text.trim();
+                final local = index.search(q);
+                if (q.length < 3) return local;
+                // ostatnia pozycja: wyszukiwanie w Open Food Facts (internet), na żądanie
+                return [...local, FoodRef(q, const [], 0, 0, 0, 0, 0, '', searchOnline: true)];
+              },
+              onSelected: (o) async {
+                if (!o.searchOnline) {
+                  setState(() => c.apply(o));
+                  return;
+                }
+                c.name.text = o.name;
+                final picked = await _searchOnline(o.name);
+                if (picked != null && mounted) setState(() => c.apply(picked));
+              },
               fieldViewBuilder: (context, ctl, focus, onSubmit) => TextField(
                 controller: ctl,
                 focusNode: focus,
@@ -564,12 +633,21 @@ class _MealFormState extends State<MealForm> {
                       shrinkWrap: true,
                       children: [
                         for (final o in options)
+                          if (o.searchOnline)
+                            ListTile(
+                              dense: true,
+                              leading: const Icon(Icons.travel_explore, size: 20),
+                              title: Text('Szukaj „${o.name}” w Open Food Facts'),
+                              subtitle: const Text('produkty markowe, wymaga internetu'),
+                              onTap: () => onSelect(o),
+                            )
+                          else
                           ListTile(
                             dense: true,
-                            title: Text(o.name),
+                            title: Text(o.display),
                             subtitle: Text('${o.kcal.round()} kcal · B ${_fmtMacro(o.protein).isEmpty ? '0' : _fmtMacro(o.protein)} · W ${_fmtMacro(o.carbs).isEmpty ? '0' : _fmtMacro(o.carbs)} · T ${_fmtMacro(o.fat).isEmpty ? '0' : _fmtMacro(o.fat)} na 100 g',
                                 style: const TextStyle(fontFeatures: tabular)),
-                            trailing: o.mine ? const Chip2('Twoje') : null,
+                            trailing: o.mine ? const Chip2('Twoje') : (o.packaged ? const Chip2('produkt') : null),
                             onTap: () => onSelect(o),
                           ),
                       ],

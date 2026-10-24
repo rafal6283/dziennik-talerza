@@ -7,6 +7,8 @@ Prywatna aplikacja na Androida i iPhone'a (Flutter): co jem, ile to kalorii i ja
 - **Kilka osób** z osobnymi dziennikami i profilami: płeć, rok urodzenia, wzrost, waga, aktywność, cel (utrzymanie, redukcja, masa), uwagi (dieta, nietolerancje, leki). Z profilu liczony jest cel kalorii (Mifflin-St Jeor × aktywność) i białka.
 - **Posiłki**: zdjęcie z aparatu lub galerii, opis (także dyktowany), składniki z gramaturą, kcal, B/W/T. Edycja, „zjedz ponownie dziś”.
 - **Podpowiedzi składników** w trakcie pisania: Twoje wcześniejsze wpisy i wbudowana tabela ok. 390 produktów i dań – także słodycze, przekąski, fast food, napoje (wartości na 100 g, typowe porcje). Wyszukiwanie rozumie odmianę („chleba żytniego”) i brak polskich znaków. Zmiana gramatury od razu przelicza kcal i makro.
+- **Polskie produkty markowe bez internetu**: paczka kilkunastu tysięcy najpopularniejszych produktów sprzedawanych w Polsce z Open Food Facts (odświeżana co miesiąc w GitHub Actions, `tool/off_pack.py`). Podpowiedzi szukają też po marce (np. „Łaciate”, „Piątnica”).
+- **Wyszukiwanie online**: ostatnia pozycja w podpowiedziach – „Szukaj w Open Food Facts” – dla rzadszych produktów (wymaga internetu).
 - **Rozpisywanie opisu bez AI**: „dwie kromki chleba żytniego z masłem i szynką, kawa z mlekiem” → składniki z ilościami (liczby, „pół”, kromki, łyżki, szklanki, gramy). Przy rozpoznawaniu AI to rozpisanie trafia do modelu jako podpowiedź.
 - **Rozpoznawanie ze zdjęcia wspierane opisem**: po zrobieniu zdjęcia aplikacja pyta o kilka słów (pisanych lub dyktowanych); produkty i ilości z opisu mają pierwszeństwo, a wartości odżywcze składników, które są w tabeli, liczone są z tabeli.
 - **Rozpoznawanie AI za darmo, na telefonie**: model Gemma 4 E2B (jednorazowe pobranie 2,6 GB) rozpoznaje składniki ze zdjęcia lub opisu i szacuje wartości odżywcze – bez internetu, konta i opłat. Opcjonalnie zamiast niego Claude z własnym kluczem API (dokładniejszy, płatny).
@@ -34,9 +36,11 @@ Rozpoznawanie AI: **Ustawienia → Rozpoznawanie AI → Na telefonie – darmowe
 - `lib/calc.dart` – zapotrzebowanie, cele, wzorce (czysty Dart, testy w `test/calc_test.dart`)
 - `lib/ai.dart` – rozpoznawanie posiłków, uzupełnianie z dyktowania, analiza (wybór: model na telefonie albo API Anthropic)
 - `lib/local_ai.dart` – Gemma 4 na telefonie (flutter_edge_ai + LiteRT-LM)
-- `lib/food_db.dart` – Open Food Facts
+- `lib/food_db.dart` – Open Food Facts (kod kreskowy, wyszukiwanie online)
+- `lib/food_pack.dart` – paczka polskich produktów offline (`assets/off_pl.json.gz`)
+- `lib/food_table.dart` – tabela produktów i dań, odmiana słów, rozpisywanie opisu
 - `lib/gas.dart` – import i analiza wiatrów (Kreska CSV, Nocny Licznik „wymiana-zdarzen” v1)
 - `lib/store.dart` – stan, zapis do pliku, zdjęcia, import/eksport
 - `lib/ui/` – ekrany; `voice.dart` – dyktowanie
 
-Szacunki kalorii i analizy to pomoc, nie porada medyczna.
+Dane produktów: [Open Food Facts](https://world.openfoodfacts.org), licencja ODbL. Szacunki kalorii i analizy to pomoc, nie porada medyczna.

@@ -59,4 +59,35 @@ class FoodDb {
     final j = jsonDecode(utf8.decode(r.bodyBytes));
     return j is Map ? parse(code, Map<String, dynamic>.from(j)) : null;
   }
+
+  /// Wyszukiwanie po nazwie (online). Open Food Facts pozwala na ok. 10 wyszukiwań na minutę – wywołuj na żądanie.
+  static Future<List<Product>> search(String query) async {
+    final q = query.trim();
+    if (q.length < 2) return const [];
+    final uri = Uri.parse('https://world.openfoodfacts.org/cgi/search.pl').replace(queryParameters: {
+      'search_terms': q,
+      'search_simple': '1',
+      'action': 'process',
+      'json': '1',
+      'page_size': '24',
+      'lc': 'pl',
+      'cc': 'pl',
+      'fields': 'code,product_name,product_name_pl,generic_name_pl,brands,nutriments,serving_quantity',
+    });
+    final http.Response r;
+    try {
+      r = await client.get(uri, headers: {'User-Agent': _ua}).timeout(const Duration(seconds: 25));
+    } catch (_) {
+      throw const FoodDbError('Brak połączenia z bazą produktów. Sprawdź internet.');
+    }
+    if (r.statusCode == 429) throw const FoodDbError('Za dużo wyszukiwań naraz. Spróbuj za minutę.');
+    if (r.statusCode != 200) throw FoodDbError('Baza produktów nie odpowiada (błąd ${r.statusCode}).');
+    final j = jsonDecode(utf8.decode(r.bodyBytes));
+    if (j is! Map || j['products'] is! List) return const [];
+    return [
+      for (final p in j['products'] as List)
+        if (p is Map)
+          if (parse('${p['code'] ?? ''}', {'status': 1, 'product': p}) case final x? when x.kcal100 > 0) x
+    ];
+  }
 }

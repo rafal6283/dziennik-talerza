@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:dziennik_talerza/ai.dart';
 import 'package:dziennik_talerza/calc.dart';
 import 'package:dziennik_talerza/food_db.dart';
+import 'package:dziennik_talerza/food_pack.dart';
 import 'package:dziennik_talerza/food_table.dart';
 import 'package:dziennik_talerza/gas.dart';
 import 'package:dziennik_talerza/models.dart';
@@ -228,6 +229,27 @@ void main() {
       expect(idx.exact('Jajka sadzone')!.name, 'jajko sadzone');
       expect(idx.search('kinder').map((x) => x.name), contains('kinder bueno'));
     });
+  });
+
+  test('paczka produktów Open Food Facts', () {
+    final gz = gzip.encode(utf8.encode(jsonEncode({
+      'built': 1,
+      'products': [
+        ['Masło ekstra', 'Łaciate', 748, 0.7, 0.7, 82, 0],
+        ['Prince Polo classic', 'Olza', 523, 5.7, 60, 28, 35],
+      ],
+    })));
+    final pack = FoodPack.decode(gz);
+    expect(pack.length, 2);
+    expect(pack[1].display, 'Prince Polo classic (Olza)');
+    expect(pack[1].portion, 35);
+    expect(pack[0].portion, 100);
+    final idx = FoodIndex.build(const [], pack: pack);
+    expect(idx.search('masło').first.name, 'masło'); // ogólna pozycja z tabeli przed markową
+    expect(idx.search('prince polo').map((x) => x.display), contains('Prince Polo classic (Olza)'));
+    expect(idx.search('laciate').first.brand, 'Łaciate'); // szukanie po marce
+    expect(parseDescription('kawałek masła', idx).items.single.ref.packaged, isFalse);
+    expect(parseDescription('prince polo', idx).items.single.item.kcal, closeTo(182, 1));
   });
 
   test('Kreska JSON z godzinami', () {

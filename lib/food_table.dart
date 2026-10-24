@@ -11,11 +11,23 @@ class FoodRef {
   final String portionLabel;
   final bool mine; // z historii użytkownika
   final int uses;
-  const FoodRef(this.name, this.aliases, this.kcal, this.protein, this.carbs, this.fat, this.portion, this.portionLabel,
-      {this.mine = false, this.uses = 0});
+  final String brand; // marka (produkty z Open Food Facts)
+  final bool packaged; // produkt z paczki Open Food Facts albo z wyszukiwania online
+  final bool searchOnline; // specjalna pozycja „Szukaj w Open Food Facts”
+  FoodRef(this.name, this.aliases, this.kcal, this.protein, this.carbs, this.fat, this.portion, this.portionLabel,
+      {this.mine = false, this.uses = 0, this.brand = '', this.packaged = false, this.searchOnline = false});
+
+  String get display => brand.isEmpty ? name : '$name ($brand)';
+
+  // przygotowane raz: znormalizowane nazwy, słowa i rdzenie (szybkie wyszukiwanie w tysiącach produktów)
+  late final List<String> names = [name, ...aliases];
+  late final List<String> norms = [for (final n in names) normalizeFood(brand.isEmpty ? n : '$n $brand')];
+  late final List<List<String>> words = [for (final n in norms) n.split(' ')];
+  late final List<List<String>> stems = [for (final w in words) w.map(stemFood).toList()];
+  late final List<List<String>> phrases = [for (final n in names) stemPhrase(n)];
 
   FoodItem item(double grams) => FoodItem(
-        name: name,
+        name: display,
         grams: grams,
         kcal: kcal * grams / 100,
         protein: protein * grams / 100,
@@ -446,7 +458,7 @@ class FoodIndex {
   final List<FoodRef> refs;
   FoodIndex(this.refs);
 
-  factory FoodIndex.build(Iterable<Meal> meals) {
+  factory FoodIndex.build(Iterable<Meal> meals, {List<FoodRef> pack = const []}) {
     final mine = <String, ({FoodItem item, int uses})>{};
     for (final m in meals.toList()..sort((a, b) => a.ts.compareTo(b.ts))) {
       for (final i in m.items) {
@@ -462,22 +474,23 @@ class FoodIndex {
     ];
     final mineKeys = mine.keys.toSet();
     refs.addAll(foodTable().where((r) => !mineKeys.contains(normalizeFood(r.name))));
+    refs.addAll(pack.where((r) => !mineKeys.contains(normalizeFood(r.display))));
     return FoodIndex(refs);
   }
 
   static int _score(FoodRef r, String q, List<String> qWords, List<String> qStems) {
     var best = 0;
-    for (final n in [r.name, ...r.aliases]) {
-      final t = normalizeFood(n);
+    for (var ni = 0; ni < r.norms.length; ni++) {
+      final t = r.norms[ni];
       int s;
       if (t == q) {
         s = 100;
       } else if (t.startsWith(q)) {
         s = 80;
       } else {
-        final words = t.split(' ');
-        final stems = words.map(stemFood).toList();
-        // każde słowo zapytania (także w innej formie: „chleba żytniego”) musi zaczynać jakieś słowo nazwy
+        final words = r.words[ni];
+        final stems = r.stems[ni];
+        // każde słowo zapytania (także w innej formie: „chleba żytniego”) musi zaczynać jakieś słowo nazwy lub marki
         var ok = true;
         var exactStems = 0;
         for (var k = 0; k < qWords.length; k++) {
@@ -499,14 +512,15 @@ class FoodIndex {
         if (!ok) continue;
         s = 60 + (exactStems * 5 > 15 ? 15 : exactStems * 5);
       }
-      if (n != r.name) s -= 5;
+      if (ni > 0) s -= 5;
       if (s > best) best = s;
     }
     if (best == 0) return 0;
-    return best + (r.mine ? 15 + (r.uses > 5 ? 5 : r.uses) : 0);
+    // ogólne pozycje z tabeli przed produktami markowymi; własne wpisy na górze
+    return best + (r.mine ? 15 + (r.uses > 5 ? 5 : r.uses) : 0) - (r.packaged ? 8 : 0);
   }
 
-  List<FoodRef> search(String query, {int limit = 8}) {
+  List<FoodRef> search(String query, {int limit = 10}) {
     final q = normalizeFood(query);
     if (q.length < 2) return const [];
     final qWords = q.split(' ');
@@ -514,7 +528,7 @@ class FoodIndex {
     final scored = <(FoodRef, int)>[
       for (final r in refs)
         if (_score(r, q, qWords, qStems) case final s when s > 0) (r, s)
-    ]..sort((a, b) => b.$2 != a.$2 ? b.$2.compareTo(a.$2) : a.$1.name.length.compareTo(b.$1.name.length));
+    ]..sort((a, b) => b.$2 != a.$2 ? b.$2.compareTo(a.$2) : a.$1.display.length.compareTo(b.$1.display.length));
     return scored.take(limit).map((e) => e.$1).toList();
   }
 
@@ -524,8 +538,9 @@ class FoodIndex {
     final qs = stemPhrase(name);
     FoodRef? byStem;
     for (final r in refs) {
+      if (r.packaged) continue; // do uzupełnienia wartości tylko tabela i własne wpisy
       if (normalizeFood(r.name) == q || r.aliases.any((a) => normalizeFood(a) == q)) return r;
-      if (byStem == null && qs.isNotEmpty && [r.name, ...r.aliases].any((n) => _sameList(stemPhrase(n), qs))) byStem = r;
+      if (byStem == null && qs.isNotEmpty && r.phrases.any((p) => _sameList(p, qs))) byStem = r;
     }
     return byStem;
   }
@@ -632,8 +647,8 @@ ParsedDescription parseDescription(String text, FoodIndex index) {
   // kandydaci: rdzenie nazw i synonimów
   final cands = <(FoodRef, List<String>, bool)>[
     for (final r in index.refs)
-      for (final (k, n) in [r.name, ...r.aliases].indexed)
-        if (stemPhrase(n) case final st when st.isNotEmpty) (r, st, k == 0)
+      for (final (k, st) in r.phrases.indexed)
+        if (st.isNotEmpty) (r, st, k == 0)
   ];
 
   bool isUnit(String stem) => _units.containsKey(stem);
@@ -697,7 +712,7 @@ ParsedDescription parseDescription(String text, FoodIndex index) {
         }
       }
       if (k == st.length) {
-        final score = st.length * 10 + exact * 3 + (r.mine ? 2 : 0) + (primary ? 1 : 0);
+        final score = st.length * 10 + exact * 3 + (r.mine ? 2 : 0) + (primary ? 1 : 0) - (r.packaged ? 4 : 0);
         if (best == null || score > best.$2) best = (r, score, j);
       }
     }
