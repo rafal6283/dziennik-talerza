@@ -1,17 +1,45 @@
 #!/usr/bin/env python3
 """Buduje assets/off_pl.json.gz: najpopularniejsze produkty sprzedawane w Polsce z Open Food Facts
-(nazwa, marka, kcal/białko/węglowodany/tłuszcz na 100 g, porcja). Dane: Open Food Facts, licencja ODbL.
+(polska nazwa, marka, kcal/białko/węglowodany/tłuszcz na 100 g, porcja). Dane: Open Food Facts, licencja ODbL.
 
-Źródło: oficjalny dzienny zrzut CSV (strumieniowo, bez limitów API wyszukiwania).
-Uruchamiane w GitHub Actions (workflow food-pack.yml)."""
-import csv, gzip, io, json, sys, time, urllib.request
+Źródło: oficjalny zrzut Parquet na Hugging Face (openfoodfacts/product-database) – zawiera nazwy w każdym
+języku, więc bierzemy polską, a gdy jej nie ma – główną. Uruchamiane w GitHub Actions (food-pack.yml)."""
+import gzip, json, re, sys, time
 
-UA = 'DziennikTalerza/1.0 (prywatna aplikacja; github.com/rafal6283/dziennik-talerza)'
-URL = 'https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz'
+import duckdb
+
 LIMIT = int(sys.argv[1]) if len(sys.argv) > 1 else 20000
 OUT = 'assets/off_pl.json.gz'
+SRC = 'hf://datasets/openfoodfacts/product-database/food.parquet'
 
-csv.field_size_limit(1 << 30)
+con = duckdb.connect()
+print(con.sql(f"DESCRIBE SELECT * FROM read_parquet('{SRC}')").fetchall(), flush=True)
+
+t0 = time.time()
+sql = f"""
+WITH pl AS (
+  SELECT
+    code, brands, lang, unique_scans_n, serving_quantity, product_name, nutriments
+  FROM read_parquet('{SRC}')
+  WHERE list_contains(countries_tags, 'en:poland')
+)
+SELECT
+  coalesce(list_filter(product_name, x -> x.lang = 'pl')[1].text,
+           list_filter(product_name, x -> x.lang = 'main')[1].text,
+           product_name[1].text) AS name,
+  list_filter(product_name, x -> x.lang = 'pl')[1].text IS NOT NULL OR lang = 'pl' AS polish,
+  brands,
+  list_filter(nutriments, x -> x.name = 'energy-kcal')[1]."100g" AS kcal,
+  list_filter(nutriments, x -> x.name = 'energy')[1]."100g" AS kj,
+  list_filter(nutriments, x -> x.name = 'proteins')[1]."100g" AS prot,
+  list_filter(nutriments, x -> x.name = 'carbohydrates')[1]."100g" AS carb,
+  list_filter(nutriments, x -> x.name = 'fat')[1]."100g" AS fat,
+  serving_quantity,
+  coalesce(unique_scans_n, 0) AS scans
+FROM pl
+"""
+rows = con.sql(sql).fetchall()
+print(f'{len(rows)} produktów z Polski, {int(time.time() - t0)} s', flush=True)
 
 
 def num(v):
@@ -21,41 +49,33 @@ def num(v):
         return None
 
 
-req = urllib.request.Request(URL, headers={'User-Agent': UA})
-rows, seen, n = [], {}, 0
-t0 = time.time()
-with urllib.request.urlopen(req, timeout=120) as r:
-    text = io.TextIOWrapper(gzip.GzipFile(fileobj=r), encoding='utf-8', errors='replace', newline='')
-    reader = csv.DictReader(text, delimiter='\t', quoting=csv.QUOTE_NONE)
-    for p in reader:
-        n += 1
-        if n % 500000 == 0:
-            print(f'{n} wierszy, {len(seen)} polskich, {int(time.time() - t0)} s', flush=True)
-        countries = (p.get('countries_en') or '') + ',' + (p.get('countries_tags') or '')
-        if 'Poland' not in countries and 'en:poland' not in countries:
-            continue
-        kcal = num(p.get('energy-kcal_100g'))
-        if kcal is None and num(p.get('energy_100g')):
-            kcal = round(num(p.get('energy_100g')) / 4.184, 1)
-        name = (p.get('product_name') or p.get('generic_name') or '').strip()
-        if not name or kcal is None or kcal < 0 or kcal > 950:
-            continue
-        prot, carb, fat = num(p.get('proteins_100g')), num(p.get('carbohydrates_100g')), num(p.get('fat_100g'))
-        if prot is None or carb is None or fat is None:
-            continue
-        brand = (p.get('brands') or '').split(',')[0].strip()
-        scans = int(num(p.get('unique_scans_n')) or 0)
-        serving = num(p.get('serving_quantity'))
-        key = (name.lower(), brand.lower())
-        row = [name[:80], brand[:40], kcal, prot, carb, fat, serving if serving and 0 < serving < 2000 else 0]
-        if key not in seen or scans > seen[key][0]:
-            seen[key] = (scans, row)
+PL_CHARS = re.compile('[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]')
+seen = {}
+for name, polish, brands, kcal, kj, prot, carb, fat, serving, scans in rows:
+    name = (name or '').strip()
+    kcal = num(kcal)
+    if kcal is None and num(kj):
+        kcal = round(num(kj) / 4.184, 1)
+    prot, carb, fat = num(prot), num(carb), num(fat)
+    if not name or kcal is None or not (0 <= kcal <= 950) or None in (prot, carb, fat):
+        continue
+    brand = (brands or '').split(',')[0].strip()
+    s = num(serving)
+    # produkty z polską nazwą wyżej; obcojęzyczne tylko te najczęściej skanowane
+    pl = bool(polish) or bool(PL_CHARS.search(name))
+    rank = (scans or 0) * (3 if pl else 1)
+    key = (name.lower(), brand.lower())
+    row = [name[:80], brand[:40], kcal, prot, carb, fat, s if s and 0 < s < 2000 else 0]
+    if key not in seen or rank > seen[key][0]:
+        seen[key] = (rank, row)
 
-print(f'gotowe: {n} wierszy, {len(seen)} polskich produktów z wartościami, {int(time.time() - t0)} s', flush=True)
 best = sorted(seen.values(), key=lambda x: -x[0])[:LIMIT]
 out = [r for _, r in best]
+print(f'wybrano {len(out)} z {len(seen)}', flush=True)
 if len(out) < 2000:
     sys.exit(f'Za mało produktów ({len(out)}) – nie nadpisuję paczki')
 with gzip.open(OUT, 'wt', encoding='utf-8') as f:
     json.dump({'source': 'Open Food Facts (ODbL)', 'country': 'pl', 'built': int(time.time()), 'products': out}, f, ensure_ascii=False, separators=(',', ':'))
 print('zapisano', OUT, len(out))
+for r in out[:15]:
+    print(r)

@@ -20,6 +20,7 @@ jobs:
       - name: Pobierz produkty
         run: |
           mkdir -p assets
+          pip install --quiet duckdb
           python3 tool/off_pack.py 20000 2>&1 | tee pack.log
       - name: Zapisz w repo
         run: |
