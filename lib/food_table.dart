@@ -677,7 +677,7 @@ ParsedDescription parseDescription(String text, FoodIndex index) {
     // najdłuższe dopasowanie nazwy od pozycji i (słowa pomocnicze w środku są pomijane)
     (FoodRef, int, int)? best; // ref, liczba słów nazwy, pozycja końca
     for (final (r, st, primary) in cands) {
-      var j = i, k = 0;
+      var j = i, k = 0, exact = 0;
       while (k < st.length && j < tokens.length) {
         final tj = tokens[j];
         if (tj.sep) break;
@@ -685,7 +685,11 @@ ParsedDescription parseDescription(String text, FoodIndex index) {
           j++;
           continue;
         }
-        if (tj.stem == st[k] || (st[k].length >= 4 && tj.stem.startsWith(st[k])) || (tj.stem.length >= 4 && st[k].startsWith(tj.stem))) {
+        if (tj.stem == st[k]) {
+          exact++;
+          k++;
+          j++;
+        } else if (st[k].length >= 4 && tj.stem.startsWith(st[k])) {
           k++;
           j++;
         } else {
@@ -693,7 +697,7 @@ ParsedDescription parseDescription(String text, FoodIndex index) {
         }
       }
       if (k == st.length) {
-        final score = st.length * 10 + (r.mine ? 3 : 0) + (primary ? 1 : 0);
+        final score = st.length * 10 + exact * 3 + (r.mine ? 2 : 0) + (primary ? 1 : 0);
         if (best == null || score > best.$2) best = (r, score, j);
       }
     }
