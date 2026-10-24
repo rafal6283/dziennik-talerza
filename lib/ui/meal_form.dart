@@ -7,6 +7,7 @@ import '../ai.dart';
 import '../calc.dart';
 import '../main.dart';
 import '../models.dart';
+import 'barcode.dart';
 import 'format.dart';
 import 'home.dart' show MealPhoto;
 import 'voice.dart';
@@ -62,6 +63,8 @@ class _MealFormState extends State<MealForm> {
   String? photoName; // zapisane wcześniej
   bool busy = false;
   bool aiOn = false;
+  bool aiLocal = false;
+  String aiHint = '';
   String? aiNote;
   String? status;
   bool statusErr = false;
@@ -82,7 +85,15 @@ class _MealFormState extends State<MealForm> {
       }
       photoName = widget.meal?.photo;
     }
-    Ai.enabled().then((v) => mounted ? setState(() => aiOn = v) : null);
+    Future.wait([Ai.enabled(), Ai.isLocal(), Ai.setupHint()]).then((r) {
+      if (mounted) {
+        setState(() {
+          aiOn = r[0] as bool;
+          aiLocal = r[1] as bool;
+          aiHint = r[2] as String;
+        });
+      }
+    });
   }
 
   static String _guessType(int h) => h < 10
@@ -124,6 +135,15 @@ class _MealFormState extends State<MealForm> {
     }
   }
 
+  Future<void> _scan() async {
+    final it = await scanFood(context);
+    if (it == null) return;
+    setState(() {
+      items.add(_ItemCtl(it));
+      if (name.text.trim().isEmpty) name.text = it.name;
+    });
+  }
+
   Future<void> _dictate() async {
     final t = await dictate(context, title: 'Co jesz?', hint: 'Np. „dwie kromki chleba żytniego z twarożkiem i rzodkiewką, kawa z mlekiem”');
     if (t == null || t.isEmpty) return;
@@ -140,7 +160,7 @@ class _MealFormState extends State<MealForm> {
       return;
     }
     setState(() => busy = true);
-    _status('Claude analizuje posiłek…');
+    _status(aiLocal ? 'Model na telefonie analizuje posiłek… (to może potrwać do minuty)' : 'Claude analizuje posiłek…');
     try {
       final g = await Ai.recognizeMeal(jpeg: newPhoto, desc: desc.text);
       for (final i in items) {
@@ -216,13 +236,19 @@ class _MealFormState extends State<MealForm> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               FilledButton.tonalIcon(onPressed: busy ? null : () => _pick(ImageSource.camera), icon: const Icon(Icons.photo_camera_outlined), label: const Text('Zrób zdjęcie')),
               const SizedBox(height: 6),
-              OutlinedButton.icon(onPressed: busy ? null : () => _pick(ImageSource.gallery), icon: const Icon(Icons.photo_library_outlined), label: const Text('Z galerii')),
+              Row(children: [
+                Expanded(child: OutlinedButton.icon(onPressed: busy ? null : () => _pick(ImageSource.gallery), icon: const Icon(Icons.photo_library_outlined), label: const Text('Galeria'))),
+                const SizedBox(width: 6),
+                Expanded(child: OutlinedButton.icon(onPressed: busy ? null : _scan, icon: const Icon(Icons.qr_code_scanner), label: const Text('Kod'))),
+              ]),
             ]),
           ),
         ]),
         const SizedBox(height: 8),
         Text(
-          aiOn ? 'Claude rozpozna, co jest na talerzu, i oszacuje kalorie.' : 'Rozpoznawanie ze zdjęć włączysz w Ustawieniach (klucz API). Składniki możesz wpisać ręcznie.',
+          aiOn
+              ? (aiLocal ? 'Model na telefonie rozpozna, co jest na talerzu, i oszacuje kalorie (darmowo, bez internetu).' : 'Claude rozpozna, co jest na talerzu, i oszacuje kalorie.')
+              : '$aiHint Produkty paczkowane dodasz skanerem kodów, resztę ręcznie.',
           style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
         ),
         const SizedBox(height: 16),

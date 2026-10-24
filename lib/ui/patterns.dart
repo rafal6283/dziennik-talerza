@@ -20,7 +20,7 @@ class _PatternsTabState extends State<PatternsTab> {
     final p = app.active;
     final since = shiftDay(todayIso(), -30);
     if (app.meals.where((m) => m.date.compareTo(since) >= 0).length < 5) {
-      setState(() => err = 'Za mało danych. Zapisz co najmniej 5 posiłków z ostatnich 30 dni (najlepiej z oceną samopoczucia).');
+      setState(() => err = 'Za mało danych. Zapisz co najmniej 5 posiłków (najlepiej z oceną samopoczucia).');
       return;
     }
     setState(() {
@@ -193,19 +193,19 @@ class _PatternsTabState extends State<PatternsTab> {
       ),
       Panel(
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          title('Analiza Claude'),
-          muted('Claude przejrzy posiłki i wpisy z ostatnich 30 dni, uwzględniając wiek, płeć, wagę, aktywność i uwagi z profilu. To obserwacje, nie diagnoza.'),
+          title('Analiza AI'),
+          muted('AI przejrzy posiłki i wpisy (model na telefonie: 14 dni, Claude: 30 dni), uwzględniając wiek, płeć, wagę, aktywność i uwagi z profilu. To obserwacje, nie diagnoza.'),
           const SizedBox(height: 12),
           FutureBuilder<bool>(
             future: Ai.enabled(),
             builder: (_, s) => s.data == false
-                ? muted('Analiza wymaga klucza API (Ustawienia → Rozpoznawanie AI).')
+                ? muted('Analiza wymaga darmowego modelu na telefonie albo klucza Claude (Ustawienia → Rozpoznawanie AI).')
                 : Align(
                     alignment: Alignment.centerLeft,
                     child: FilledButton.icon(
                       onPressed: busy ? null : _analyze,
                       icon: busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.auto_awesome),
-                      label: Text(busy ? 'Claude czyta dziennik…' : 'Przeanalizuj wzorce: ${app.active.name}'),
+                      label: Text(busy ? 'AI czyta dziennik…' : 'Przeanalizuj wzorce: ${app.active.name}'),
                     ),
                   ),
           ),

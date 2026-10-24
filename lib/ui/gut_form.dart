@@ -58,7 +58,7 @@ class _GutFormState extends State<GutForm> {
     if (!await Ai.enabled()) {
       setState(() {
         note.text = note.text.trim().isEmpty ? t : '${note.text.trim()} $t';
-        status = 'Zapisałem to w notatce. Zaznacz objawy poniżej. Z kluczem API pola uzupełnią się same.';
+        status = 'Zapisałem to w notatce. Zaznacz objawy poniżej. Z modelem AI (Ustawienia → Rozpoznawanie AI) pola uzupełnią się same.';
         statusErr = false;
       });
       return;

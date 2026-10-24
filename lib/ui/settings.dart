@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 
 import '../ai.dart';
 import '../calc.dart';
+import '../local_ai.dart';
 import '../main.dart';
 import '../security/lock.dart';
 import 'format.dart';
+import 'model_screen.dart';
 import 'security_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -20,6 +22,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   LockConfig? lock;
   String? key;
   String model = aiModels.first.$1;
+  String provider = 'local';
+  bool localReady = false;
 
   @override
   void initState() {
@@ -31,11 +35,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final c = await Lock.load();
     final k = await Ai.key();
     final m = await Ai.model();
+    final pr = await Ai.provider();
+    final lr = await LocalAi.ready();
     if (mounted) {
       setState(() {
         lock = c;
         key = k;
         model = m;
+        provider = pr;
+        localReady = lr;
       });
     }
   }
@@ -147,37 +155,71 @@ class _SettingsScreenState extends State<SettingsScreen> {
       appBar: AppBar(title: const Text('Ustawienia')),
       body: ListView(children: [
         const SectionTitle('Rozpoznawanie AI'),
-        ListTile(
-          leading: const Icon(Icons.key_outlined),
-          title: const Text('Klucz API Anthropic'),
-          subtitle: Text(key == null ? 'Brak – składniki wpisujesz ręcznie' : 'Ustawiony (…${key!.substring(key!.length > 4 ? key!.length - 4 : 0)})'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: _editKey,
-        ),
-        ListTile(
-          leading: const Icon(Icons.auto_awesome_outlined),
-          title: const Text('Model'),
-          subtitle: Text(aiModels.firstWhere((m) => m.$1 == model, orElse: () => (model, model)).$2),
-          enabled: key != null,
-          onTap: () async {
-            final m = await showDialog<String>(
-              context: context,
-              builder: (c) => SimpleDialog(title: const Text('Model'), children: [
-                for (final x in aiModels)
-                  RadioListTile<String>(value: x.$1, groupValue: model, title: Text(x.$2), subtitle: Text(x.$1), onChanged: (v) => Navigator.pop(c, v)),
-              ]),
-            );
-            if (m != null) {
-              await Ai.setModel(m);
+        for (final p in aiProviders)
+          RadioListTile<String>(
+            value: p.$1,
+            groupValue: provider,
+            title: Text(p.$2),
+            subtitle: Text(switch (p.$1) {
+              'local' => localReady ? 'Gemma 4 na telefonie – pobrany, działa bez internetu' : 'Gemma 4 na telefonie – wymaga pobrania ${LocalAi.sizeLabel}',
+              'claude' => key == null ? 'Najdokładniejsze, płatne za użycie – brak klucza' : 'Najdokładniejsze, płatne za użycie – klucz ustawiony',
+              _ => 'Składniki wpisujesz ręcznie albo skanujesz kod kreskowy',
+            }),
+            onChanged: (v) async {
+              await Ai.setProvider(v!);
               await _load();
-            }
-          },
-        ),
+              if (v == 'local' && !localReady && mounted) {
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => const ModelScreen()));
+                _load();
+              }
+              if (v == 'claude' && key == null && mounted) _editKey();
+            },
+          ),
+        if (provider == 'local')
+          ListTile(
+            leading: const Icon(Icons.memory),
+            title: const Text('Model na telefonie'),
+            subtitle: Text(localReady ? 'Pobrany · test, usuwanie' : 'Pobierz (${LocalAi.sizeLabel})'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const ModelScreen()));
+              _load();
+            },
+          ),
+        if (provider == 'claude') ...[
+          ListTile(
+            leading: const Icon(Icons.key_outlined),
+            title: const Text('Klucz API Anthropic'),
+            subtitle: Text(key == null ? 'Brak' : 'Ustawiony (…${key!.substring(key!.length > 4 ? key!.length - 4 : 0)})'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _editKey,
+          ),
+          ListTile(
+            leading: const Icon(Icons.auto_awesome_outlined),
+            title: const Text('Model'),
+            subtitle: Text(aiModels.firstWhere((m) => m.$1 == model, orElse: () => (model, model)).$2),
+            enabled: key != null,
+            onTap: () async {
+              final m = await showDialog<String>(
+                context: context,
+                builder: (c) => SimpleDialog(title: const Text('Model'), children: [
+                  for (final x in aiModels)
+                    RadioListTile<String>(value: x.$1, groupValue: model, title: Text(x.$2), subtitle: Text(x.$1), onChanged: (v) => Navigator.pop(c, v)),
+                ]),
+              );
+              if (m != null) {
+                await Ai.setModel(m);
+                await _load();
+              }
+            },
+          ),
+        ],
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: Text(
-            'Z kluczem: rozpoznawanie posiłków ze zdjęć i opisów, uzupełnianie formularzy z dyktowania i analiza wzorców. '
-            'Do Anthropic trafia tylko to, co analizujesz w danej chwili (zdjęcie, opis albo dziennik z profilem osoby). Klucz jest zapisany tylko w tym telefonie.',
+            provider == 'claude'
+                ? 'Do Anthropic trafia tylko to, co analizujesz w danej chwili (zdjęcie, opis albo dziennik z profilem osoby). Klucz jest zapisany tylko w tym telefonie.'
+                : 'Produkty paczkowane najdokładniej dodasz skanerem kodów kreskowych (darmowa baza Open Food Facts) – przycisk „Kod” w formularzu posiłku.',
             style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12.5),
           ),
         ),

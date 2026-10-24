@@ -15,7 +15,7 @@ def edit(path, pairs):
 g = 'android/app/build.gradle.kts'
 s = open(g, encoding='utf-8').read()
 s = re.sub(r'applicationId = "[^"]+"', 'applicationId = "pl.dziennik.talerza"', s, count=1)
-s = re.sub(r'minSdk = flutter\.minSdkVersion', 'minSdk = maxOf(flutter.minSdkVersion, 24)', s, count=1)
+s = re.sub(r'minSdk = flutter\.minSdkVersion', 'minSdk = maxOf(flutter.minSdkVersion, 30)', s, count=1)
 if 'signingConfigs.getByName("debug")' not in s or 'buildTypes {' not in s:
     sys.exit('PATCH FAILED: build.gradle.kts ma inny układ')
 s = s.replace('    buildTypes {', '''    // Stały klucz w (prywatnym) repo – każda nowa wersja instaluje się jako aktualizacja.
@@ -40,7 +40,8 @@ s = re.sub(r'android:label="[^"]*"', 'android:label="Dziennik talerza"', s, coun
 s = re.sub(r'(<manifest[^>]*>)', r'''\1
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
-    <uses-permission android:name="android.permission.RECORD_AUDIO"/>''', s, count=1)
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.CAMERA"/>''', s, count=1)
 # rozpoznawanie mowy (Android 11+ wymaga deklaracji usługi)
 if '<queries>' in s:
     s = s.replace('<queries>', '''<queries>

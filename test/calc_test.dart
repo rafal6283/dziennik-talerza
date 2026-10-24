@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dziennik_talerza/ai.dart';
 import 'package:dziennik_talerza/calc.dart';
+import 'package:dziennik_talerza/food_db.dart';
 import 'package:dziennik_talerza/models.dart';
 import 'package:dziennik_talerza/store.dart';
 
@@ -119,6 +120,25 @@ void main() {
     expect(shiftDay('2026-03-01', -1), '2026-02-28');
     expect(shiftDay('2026-12-31', 1), '2027-01-01');
     expect(shiftDay('2026-03-29', 1), '2026-03-30'); // zmiana czasu
+  });
+
+  test('produkt z Open Food Facts', () {
+    final p = FoodDb.parse('5900000000000', {
+      'status': 1,
+      'product': {
+        'product_name': 'Jogurt naturalny',
+        'brands': 'Piątnica, Inna',
+        'serving_quantity': '150',
+        'nutriments': {'energy-kcal_100g': 61, 'proteins_100g': 4.3, 'carbohydrates_100g': 5.9, 'fat_100g': 2},
+      },
+    })!;
+    expect(p.label, 'Jogurt naturalny (Piątnica)');
+    expect(p.kcal100, 61);
+    expect(p.serving, 150);
+    final kj = FoodDb.parse('1', {'status': 1, 'product': {'product_name_pl': 'Chleb', 'nutriments': {'energy_100g': 1046}}})!;
+    expect(kj.kcal100, closeTo(250, 0.1));
+    expect(kj.serving, isNull);
+    expect(FoodDb.parse('2', {'status': 0}), isNull);
   });
 
   test('JSON z odpowiedzi AI', () {

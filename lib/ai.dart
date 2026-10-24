@@ -2,11 +2,13 @@
 // Bez klucza aplikacja działa normalnie, tylko bez rozpoznawania i analizy.
 
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'calc.dart';
+import 'local_ai.dart';
 import 'models.dart';
 
 const aiModels = [
@@ -47,17 +49,74 @@ class ReactionGuess {
   const ReactionGuess(this.energy, this.satiety, this.symptoms, this.after, this.note);
 }
 
+/// Kto rozpoznaje: 'local' – Gemma na telefonie (darmowe), 'claude' – API Anthropic (płatne), 'off'.
+const aiProviders = [
+  ('local', 'Na telefonie – darmowe'),
+  ('claude', 'Claude – płatne (klucz API)'),
+  ('off', 'Wyłączone'),
+];
+
 class Ai {
   static const _kKey = 'ai_key';
   static const _kModel = 'ai_model';
+  static const _kProvider = 'ai_provider';
   static http.Client client = http.Client();
+
+  static Future<String> provider() async {
+    final p = await SharedPreferences.getInstance();
+    final v = p.getString(_kProvider);
+    if (v != null) return v;
+    // starsze wersje: kto miał klucz, zostaje przy Claude
+    return (p.getString(_kKey) ?? '').trim().isNotEmpty ? 'claude' : 'local';
+  }
+
+  static Future<void> setProvider(String v) async => (await SharedPreferences.getInstance()).setString(_kProvider, v);
+  static Future<bool> isLocal() async => (await provider()) == 'local';
 
   static Future<String?> key() async {
     final k = (await SharedPreferences.getInstance()).getString(_kKey);
     return (k == null || k.trim().isEmpty) ? null : k.trim();
   }
 
-  static Future<bool> enabled() async => (await key()) != null;
+  /// Czy rozpoznawanie jest gotowe do użycia.
+  static Future<bool> enabled() async => switch (await provider()) {
+        'local' => await LocalAi.ready(),
+        'claude' => (await key()) != null,
+        _ => false,
+      };
+
+  /// Podpowiedź, gdy rozpoznawanie nie jest gotowe.
+  static Future<String> setupHint() async => switch (await provider()) {
+        'local' => 'Pobierz darmowy model w Ustawieniach → Rozpoznawanie AI.',
+        'claude' => 'Dodaj klucz API w Ustawieniach → Rozpoznawanie AI.',
+        _ => 'Rozpoznawanie jest wyłączone w Ustawieniach.',
+      };
+
+  /// Wspólne wejście: tekst + opcjonalne zdjęcie, wybrany dostawca.
+  static Future<String> complete(String prompt, {Uint8List? jpeg, int maxTokens = 1500}) async {
+    final prov = await provider();
+    if (prov == 'local') {
+      if (!await LocalAi.ready()) throw const AiError('Pobierz darmowy model w Ustawieniach → Rozpoznawanie AI.');
+      try {
+        final t = await LocalAi.ask(prompt, image: jpeg, maxOutputTokens: maxTokens > 1024 ? 1024 : maxTokens);
+        if (t.isEmpty) throw const AiError('Model nie zwrócił odpowiedzi. Spróbuj ponownie.');
+        return t;
+      } on AiError {
+        rethrow;
+      } catch (e) {
+        final m = '$e';
+        if (m.contains('memory') || m.contains('OutOfMemory') || m.contains('killed')) {
+          throw const AiError('Za mało pamięci na model. Zamknij inne aplikacje i spróbuj ponownie.');
+        }
+        throw AiError('Model na telefonie nie zadziałał ($m). Jeśli to się powtarza, usuń i pobierz model ponownie w Ustawieniach.');
+      }
+    }
+    if (prov == 'off') throw const AiError('Rozpoznawanie jest wyłączone w Ustawieniach.');
+    return _ask([
+      if (jpeg != null) {'type': 'image', 'source': {'type': 'base64', 'media_type': 'image/jpeg', 'data': base64Encode(jpeg)}},
+      {'type': 'text', 'text': prompt},
+    ], maxTokens: maxTokens);
+  }
   static Future<void> setKey(String? k) async {
     final p = await SharedPreferences.getInstance();
     if (k == null || k.trim().isEmpty) {
@@ -145,10 +204,7 @@ ${desc.trim().isNotEmpty ? 'Opis od użytkownika (mógł być podyktowany głose
 Rozpoznaj składniki, oszacuj realistyczne gramatury (porcje typowe dla Polski) i wartości odżywcze każdego składnika. Jeśli opis kłóci się ze zdjęciem, ufaj opisowi.
 Odpowiedz wyłącznie JSON-em w tym kształcie, nazwy po polsku, liczby bez jednostek:
 {"name":"krótka nazwa posiłku","items":[{"name":"składnik","grams":120,"kcal":180,"protein":6,"carbs":30,"fat":4}],"confidence":"niska|średnia|wysoka","note":"jedno zdanie: co było niepewne"}''';
-    final j = parseJson(await _ask([
-      if (jpeg != null) {'type': 'image', 'source': {'type': 'base64', 'media_type': 'image/jpeg', 'data': base64Encode(jpeg)}},
-      {'type': 'text', 'text': prompt},
-    ]));
+    final j = parseJson(await complete(prompt, jpeg: jpeg == null ? null : Uint8List.fromList(jpeg)));
     final items = [for (final e in (j['items'] is List ? j['items'] as List : const [])) if (e is Map) FoodItem.fromJson(Map<String, dynamic>.from(e))]
         .where((i) => i.name.isNotEmpty)
         .toList();
@@ -163,9 +219,7 @@ Zamień to na dane. Dozwolone objawy (użyj dokładnie tych nazw): ${gutSymptoms
 comfort to ogólny komfort brzucha 1–5 (1 bardzo źle, 5 świetnie), 0 jeśli nie da się ocenić. bristol 1–7 tylko jeśli opisano stolec, inaczej 0.
 when: jedno z ${gutWhen.map((w) => w.$1).join(', ')} albo null. note: to, czego nie dało się zapisać w polach, krótko, po polsku.
 Odpowiedz wyłącznie JSON-em: {"comfort":3,"symptoms":[{"name":"wzdęcia","sev":2}],"bristol":0,"when":null,"note":""}''';
-    final j = parseJson(await _ask([
-      {'type': 'text', 'text': prompt}
-    ], maxTokens: 500));
+    final j = parseJson(await complete(prompt, maxTokens: 500));
     final syms = <GutSymptom>[
       for (final e in (j['symptoms'] is List ? j['symptoms'] as List : const []))
         if (e is Map && gutSymptoms.contains('${e['name']}')) GutSymptom('${e['name']}', ((e['sev'] as num?)?.round() ?? 1).clamp(1, 3))
@@ -181,9 +235,7 @@ Dozwolone objawy (dokładnie te nazwy): ${reactionSymptoms.join(', ')}.
 energy 1–5 (1 zero sił, 5 pełno energii), satiety 1–5 (1 głodny, 5 przejedzony), 0 jeśli nie wiadomo.
 after: jedno z ${reactionAfter.join(', ')} albo null. note: reszta, krótko, po polsku.
 Odpowiedz wyłącznie JSON-em: {"energy":3,"satiety":4,"symptoms":["senność"],"after":"1 h","note":""}''';
-    final j = parseJson(await _ask([
-      {'type': 'text', 'text': prompt}
-    ], maxTokens: 400));
+    final j = parseJson(await complete(prompt, maxTokens: 400));
     return ReactionGuess(
       ((j['energy'] as num?)?.round() ?? 0).clamp(0, 5),
       ((j['satiety'] as num?)?.round() ?? 0).clamp(0, 5),
@@ -193,7 +245,7 @@ Odpowiedz wyłącznie JSON-em: {"energy":3,"satiety":4,"symptoms":["senność"],
     );
   }
 
-  static String journalText(Person p, List<Meal> meals, List<GutEntry> gut, String since) {
+  static String journalText(Person p, List<Meal> meals, List<GutEntry> gut, String since, {int mealChars = 60000, int gutChars = 30000}) {
     final ms = meals.where((m) => m.date.compareTo(since) >= 0).toList()..sort((a, b) => a.ts.compareTo(b.ts));
     final gs = gut.where((g) => g.date.compareTo(since) >= 0).toList()..sort((a, b) => a.ts.compareTo(b.ts));
     final byId = {for (final m in meals) m.id: m};
@@ -213,24 +265,25 @@ Odpowiedz wyłącznie JSON-em: {"energy":3,"satiety":4,"symptoms":["senność"],
           '${g.note.isNotEmpty ? ', notatka: ${g.note}' : ''}';
     }).join('\n');
     String cut(String s, int n) => s.length > n ? s.substring(s.length - n) : s;
-    return 'Posiłki:\n${cut(lines, 60000)}\n\nWpisy o trawieniu (często z rana, dotyczą posiłków z poprzedniego dnia; reakcje bywają opóźnione o 6–30 godzin):\n${gl.isEmpty ? 'brak' : cut(gl, 30000)}';
+    return 'Posiłki:\n${cut(lines, mealChars)}\n\nWpisy o trawieniu (często z rana, dotyczą posiłków z poprzedniego dnia; reakcje bywają opóźnione o 6–30 godzin):\n${gl.isEmpty ? 'brak' : cut(gl, gutChars)}';
   }
 
   static Future<String> analyze(Person p, List<Meal> meals, List<GutEntry> gut) async {
-    final since = shiftDay(todayIso(), -30);
-    final prompt = '''Oto dziennik posiłków z ostatnich 30 dni osoby o imieniu ${p.name} i to, jak się czuła po jedzeniu.
+    // model na telefonie ma małe okno kontekstu (4096 tokenów) – dostaje 14 dni i skrócony dziennik
+    final local = await isLocal();
+    final days = local ? 14 : 30;
+    final since = shiftDay(todayIso(), -days);
+    final prompt = '''Oto dziennik posiłków z ostatnich $days dni osoby o imieniu ${p.name} i to, jak się czuła po jedzeniu.
 Dane osoby: ${personLine(p)}.
 Uwzględnij wiek, płeć, masę ciała, aktywność, cel i uwagi przy ocenie kalorii, białka i objawów (np. inne potrzeby nastolatka, osoby starszej, kobiety i mężczyzny; nietolerancje z uwag). Jeśli danych osoby brakuje, napisz, które warto uzupełnić. Zwracaj się bezpośrednio do tej osoby.
 
-${journalText(p, meals, gut, since)}
+${local ? journalText(p, meals, gut, since, mealChars: 5200, gutChars: 1800) : journalText(p, meals, gut, since)}
 
-Przeanalizuj to po polsku, zwięźle (maks. ok. 300 słów), zwykłym tekstem bez nagłówków markdown i bez gwiazdek:
+Przeanalizuj to po polsku, zwięźle (maks. ok. ${local ? 200 : 300} słów), zwykłym tekstem bez nagłówków markdown i bez gwiazdek:
 1. 2–4 najwyraźniejsze zależności między jedzeniem a samopoczuciem i trawieniem (także opóźnione, z dnia na dzień), z liczbą przypadków, na których się opierasz.
 2. Co widać w kaloriach i makroskładnikach względem celu tej osoby (regularność, pory, białko).
 3. 2–3 konkretne rzeczy do przetestowania w kolejnych tygodniach.
 Zaznacz, gdzie danych jest za mało na wniosek. Nie stawiaj diagnoz; przy powtarzających się objawach trawiennych zasugeruj konsultację z lekarzem.''';
-    return _ask([
-      {'type': 'text', 'text': prompt}
-    ], maxTokens: 2000);
+    return complete(prompt, maxTokens: 2000);
   }
 }
