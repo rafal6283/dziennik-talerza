@@ -4,6 +4,7 @@ import '../ai.dart';
 import '../calc.dart';
 import '../gas.dart';
 import '../main.dart';
+import 'charts.dart';
 import 'format.dart';
 
 class PatternsTab extends StatefulWidget {
@@ -55,11 +56,6 @@ class _PatternsTabState extends State<PatternsTab> {
           ]),
         );
 
-    // --- 7 dni kalorii ---
-    final days = [for (var i = 6; i >= 0; i--) shiftDay(today, -i)];
-    final vals = [for (final d in days) dayTotal(meals, d).kcal];
-    final maxV = [goal * 1.25, ...vals].reduce((a, b) => a > b ? a : b);
-
     // --- trawienie ---
     final gut30 = gut.where((g) => g.date.compareTo(shiftDay(today, -30)) >= 0).toList();
     final freq = gutFrequency(gut30);
@@ -73,62 +69,23 @@ class _PatternsTabState extends State<PatternsTab> {
     return ListView(padding: const EdgeInsets.only(top: 6, bottom: 32), children: [
       Panel(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          title('Kalorie · ostatnie 7 dni'),
-          SizedBox(
-            height: 150,
-            child: LayoutBuilder(builder: (context, c) {
-              const labelH = 36.0;
-              final h = c.maxHeight - labelH;
-              return Stack(children: [
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 18 + h * goal / maxV,
-                  child: Container(height: 1.5, color: Palette.good(context).withValues(alpha: 0.8)),
-                ),
-                Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                  for (var i = 0; i < 7; i++)
-                    Expanded(
-                      child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
-                        Text(vals[i] > 0 ? '${vals[i].round()}' : '–', style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant, fontFeatures: tabular)),
-                        Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 5),
-                          height: (h - 4) * (vals[i] / maxV) + 2,
-                          decoration: BoxDecoration(
-                            color: vals[i] > goal ? Palette.bad(context) : Palette.amber(context),
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(6), bottom: Radius.circular(2)),
-                          ),
-                        ),
-                        SizedBox(height: 18, child: Center(child: Text(shortDay(days[i]), style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)))),
-                      ]),
-                    ),
-                ]),
-              ]);
-            }),
-          ),
+          title('Kalorie dzień po dniu'),
+          KcalChart(meals: meals, goal: goal, today: today),
           const SizedBox(height: 6),
-          muted('Zielona linia to cel tej osoby: $goal kcal.'),
+          muted('Zielona linia to cel tej osoby: $goal kcal. Dotknij słupka albo przesuń palcem, żeby zobaczyć dzień.'),
         ]),
       ),
       Panel(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           title('Trawienie · ostatnie 14 dni'),
-          Row(children: [
-            for (var i = 13; i >= 0; i--)
-              Expanded(
-                child: Builder(builder: (_) {
-                  final d = shiftDay(today, -i);
-                  final s = gutDayScore(gut.where((g) => g.date == d));
-                  return Column(children: [
-                    AspectRatio(
-                      aspectRatio: 1,
-                      child: Container(margin: const EdgeInsets.all(2), decoration: BoxDecoration(color: Palette.comfort(context, s), borderRadius: BorderRadius.circular(5))),
-                    ),
-                    Text('${dayOfMonth(d)}', style: TextStyle(fontSize: 9.5, color: cs.onSurfaceVariant)),
-                  ]);
-                }),
-              ),
-          ]),
+          Builder(builder: (_) {
+            final ds = [for (var i = 13; i >= 0; i--) shiftDay(today, -i)];
+            return GutStrip(
+              days: ds,
+              scores: [for (final d in ds) gutDayScore(gut.where((g) => g.date == d))],
+              counts: [for (final d in ds) gut.where((g) => g.date == d).length],
+            );
+          }),
           const SizedBox(height: 8),
           Wrap(spacing: 12, runSpacing: 4, children: [
             for (final l in [(5, 'dobrze'), (3, 'tak sobie'), (1, 'źle'), (0, 'brak wpisu')])
@@ -194,35 +151,16 @@ class _PatternsTabState extends State<PatternsTab> {
               if (gs.night != null) 'Nocny Licznik (w nocy)',
             ].join(' · ')),
             const SizedBox(height: 10),
-            SizedBox(
-              height: 120,
-              child: Builder(builder: (context) {
-                final ds = [for (var i = 13; i >= 0; i--) shiftDay(today, -i)];
-                final dayV = [for (final d in ds) gs.day(d)];
-                final nightV = [for (final d in ds) gs.nightAfter(d)];
-                final mx = [1, for (var i = 0; i < 14; i++) (dayV[i] ?? 0) + (nightV[i] ?? 0)].reduce((a, b) => a > b ? a : b).toDouble();
-                return Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                  for (var i = 0; i < 14; i++)
-                    Expanded(
-                      child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
-                        Text(dayV[i] == null && nightV[i] == null ? '–' : '${(dayV[i] ?? 0) + (nightV[i] ?? 0)}',
-                            style: TextStyle(fontSize: 9.5, color: cs.onSurfaceVariant, fontFeatures: tabular)),
-                        Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 2),
-                          height: 70 * (nightV[i] ?? 0) / mx,
-                          color: cs.tertiary,
-                        ),
-                        Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 2),
-                          height: 70 * (dayV[i] ?? 0) / mx + 1,
-                          decoration: BoxDecoration(color: Palette.amber(context), borderRadius: const BorderRadius.vertical(bottom: Radius.circular(2))),
-                        ),
-                        SizedBox(height: 16, child: Center(child: Text('${dayOfMonth(ds[i])}', style: TextStyle(fontSize: 9.5, color: cs.onSurfaceVariant)))),
-                      ]),
-                    ),
-                ]);
-              }),
-            ),
+            Builder(builder: (context) {
+              final ds = [for (var i = 13; i >= 0; i--) shiftDay(today, -i)];
+              return GasBars(
+                days: ds,
+                day: [for (final d in ds) gs.day(d)],
+                night: [for (final d in ds) gs.nightAfter(d)],
+                dayColor: Palette.amber(context),
+                nightColor: cs.tertiary,
+              );
+            }),
             Wrap(spacing: 12, children: [
               if (gs.kreska != null)
                 Row(mainAxisSize: MainAxisSize.min, children: [Container(width: 10, height: 10, color: Palette.amber(context)), const SizedBox(width: 4), muted('dzień')]),

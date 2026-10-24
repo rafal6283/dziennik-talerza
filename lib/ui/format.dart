@@ -155,6 +155,13 @@ class Meter extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ClipRRect(
         borderRadius: BorderRadius.circular(99),
-        child: LinearProgressIndicator(value: fraction.clamp(0, 1), minHeight: height, color: color, backgroundColor: Palette.sunk(context)),
+        // pasek wypełnia się płynnie przy pokazaniu i przy każdej zmianie
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: fraction.clamp(0, 1).toDouble()),
+          duration: const Duration(milliseconds: 650),
+          curve: Curves.easeOutCubic,
+          builder: (context, v, _) =>
+              LinearProgressIndicator(value: v, minHeight: height, color: color, backgroundColor: Palette.sunk(context)),
+        ),
       );
 }

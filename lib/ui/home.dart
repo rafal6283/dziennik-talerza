@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../calc.dart';
 import '../main.dart';
 import '../models.dart';
+import 'charts.dart';
 import 'format.dart';
 import 'gut_form.dart';
 import 'meal_form.dart';
@@ -195,7 +196,14 @@ class _BudgetCard extends StatelessWidget {
     return Panel(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text('${t.kcal.round()}', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w800, height: 1, fontFeatures: tabular)),
+          // liczba kalorii "dolicza się" do nowej wartości
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: t.kcal),
+            duration: const Duration(milliseconds: 700),
+            curve: Curves.easeOutCubic,
+            builder: (context, v, _) =>
+                Text('${v.round()}', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w800, height: 1, fontFeatures: tabular)),
+          ),
           const SizedBox(width: 8),
           Expanded(child: Padding(padding: const EdgeInsets.only(bottom: 4), child: Text('z $goal kcal', overflow: TextOverflow.ellipsis, style: TextStyle(color: cs.onSurfaceVariant)))),
           Padding(
@@ -208,9 +216,21 @@ class _BudgetCard extends StatelessWidget {
         Meter(goal > 0 ? t.kcal / goal : 0, left >= 0 ? Palette.amber(context) : Palette.bad(context), height: 10),
         const SizedBox(height: 14),
         Row(children: [
-          macro('Białko', pt != null ? '${t.p.round()} / $pt g' : '${t.p.round()} g'),
-          macro('Węglowodany', '${t.c.round()} g'),
-          macro('Tłuszcz', '${t.f.round()} g'),
+          MacroRing(m: t, size: 84),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(children: [
+              Row(children: [
+                macro('Białko', pt != null ? '${t.p.round()} / $pt g' : '${t.p.round()} g'),
+                macro('Węglowodany', '${t.c.round()} g'),
+              ]),
+              const SizedBox(height: 8),
+              Row(children: [
+                macro('Tłuszcz', '${t.f.round()} g'),
+                const Expanded(child: SizedBox()),
+              ]),
+            ]),
+          ),
         ]),
       ]),
     );
