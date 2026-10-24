@@ -1,0 +1,35 @@
+flutter_edge_ai: Downloading litertlm native libs from https://github.com/DenisovAV/flutter_edge_ai/releases/download/native-v0.18.0-g/litertlm-linux_x86_64.tar.gz ...
+
+flutter_edge_ai: Checksum verified (litertlm-linux_x86_64.tar.gz)
+
+flutter_edge_ai: litertlm libs cached to /home/runner/.cache/flutter_gemma/native/linux_x86_64
+
+
+::group::✅ Passing tests
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/lock_test.dart: PIN: zapis skrótu, weryfikacja i blokada po błędnych próbach
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/lock_test.dart: Wzór i migracja ze starej blokady
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/lock_test.dart: Długość PIN-u zapamiętana do odblokowania bez zatwierdzania
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/calc_test.dart: profil Mifflin-St Jeor i cele
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/calc_test.dart: profil kobieta, redukcja nie schodzi poniżej 110% BMR
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/calc_test.dart: profil niepełnoletni: bez redukcji
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/calc_test.dart: profil niepełny profil: cel domyślny
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/calc_test.dart: trawienie okno 30 h i podejrzane posiłki
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/calc_test.dart: trawienie składniki przed złym trawieniem
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/calc_test.dart: trawienie lekki objaw bez oceny komfortu to nie „złe” trawienie
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/calc_test.dart: reakcje po posiłkach i energia
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/calc_test.dart: daty
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/calc_test.dart: podpowiedzi składników
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/calc_test.dart: wiatry Kreska CSV
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/calc_test.dart: wiatry Nocny Licznik i ocena po dniach
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/calc_test.dart: opis → składniki odmiana i ilości
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/calc_test.dart: opis → składniki nieznane fragmenty
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/calc_test.dart: opis → składniki wyszukiwanie w odmianie
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/calc_test.dart: paczka produktów Open Food Facts
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/calc_test.dart: Kreska JSON z godzinami
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/calc_test.dart: produkt z Open Food Facts
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/calc_test.dart: JSON z odpowiedzi AI
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/calc_test.dart: zapis, odczyt i import z wersji przeglądarkowej
+✅ /home/runner/work/dziennik-talerza/dziennik-talerza/test/app_flow_test.dart: ekrany otwierają się bez błędów
+::endgroup::
+
+🎉 24 tests passed.
