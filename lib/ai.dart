@@ -21,7 +21,8 @@ const aiModels = [
 
 class AiError implements Exception {
   final String message;
-  const AiError(this.message);
+  final String? raw; // surowa odpowiedź modelu (do podglądu, gdy nie dała się odczytać)
+  const AiError(this.message, [this.raw]);
   @override
   String toString() => message;
 }
@@ -175,22 +176,89 @@ class Ai {
   }
 
   /// Wyciąga jeden obiekt JSON z odpowiedzi (całość, blok ``` albo od pierwszej { do ostatniej }).
+  /// Wyciąga obiekt JSON z odpowiedzi modelu – także gdy jest w bloku ```, ma komentarze, przecinki na końcu,
+  /// polskie przecinki dziesiętne albo została ucięta w połowie (mały model na telefonie).
   static Map<String, dynamic> parseJson(String text) {
+    final v = tryParseJson(text);
+    if (v != null) return v;
+    throw AiError('Odpowiedź przyszła w złym formacie. Spróbuj jeszcze raz.', text);
+  }
+
+  static Map<String, dynamic>? tryParseJson(String text) {
     var t = text.trim();
-    final fence = RegExp(r'```(?:json)?\s*([\s\S]*?)```').firstMatch(t);
-    if (fence != null) t = fence.group(1)!.trim();
-    try {
-      final v = jsonDecode(t);
+    final fence = RegExp(r'```(?:json|JSON)?\s*([\s\S]*?)(```|$)').firstMatch(t);
+    if (fence != null && fence.group(1)!.contains(RegExp(r'[{\[]'))) t = fence.group(1)!.trim();
+    final start = t.indexOf(RegExp(r'[{\[]'));
+    if (start < 0) return null;
+    t = t.substring(start);
+    Map<String, dynamic>? asMap(dynamic v) {
       if (v is Map) return Map<String, dynamic>.from(v);
-    } catch (_) {}
-    final a = t.indexOf('{'), b = t.lastIndexOf('}');
-    if (a >= 0 && b > a) {
+      if (v is List) return {'items': v};
+      return null;
+    }
+
+    String clean(String x) => x
+        .replaceAll(RegExp(r'//[^\n"]*\n'), '\n') // komentarze
+        .replaceAll(RegExp('[„”“]'), '"')
+        .replaceAllMapped(RegExp(r'(:\s*-?\d+),(\d+)'), (m) => '${m[1]}.${m[2]}') // 1,5 → 1.5
+        .replaceAllMapped(RegExp(r'(:\s*-?\d+(?:\.\d+)?)\s*(?:g|kcal|ml)\b'), (m) => m[1]!) // „120 g” → 120
+        .replaceAllMapped(RegExp(r',\s*([}\]])'), (m) => m[1]!); // przecinek na końcu
+    for (final cand in [t, clean(t)]) {
       try {
-        final v = jsonDecode(t.substring(a, b + 1));
-        if (v is Map) return Map<String, dynamic>.from(v);
+        if (asMap(jsonDecode(cand)) case final m?) return m;
+      } catch (_) {}
+      // nadmiar tekstu po JSON-ie
+      final end = cand.lastIndexOf(RegExp(r'[}\]]'));
+      if (end > 0) {
+        try {
+          if (asMap(jsonDecode(cand.substring(0, end + 1))) case final m?) return m;
+        } catch (_) {}
+      }
+    }
+    // ucięta odpowiedź: tniemy na kolejnych „}” od końca i domykamy nawiasy
+    final c = clean(t);
+    var tries = 0;
+    for (var pos = c.lastIndexOf('}'); pos > 0 && tries < 60; pos = c.lastIndexOf('}', pos - 1), tries++) {
+      final head = c.substring(0, pos + 1);
+      final stack = <String>[];
+      var inStr = false, esc = false;
+      for (final ch in head.split('')) {
+        if (inStr) {
+          if (esc) {
+            esc = false;
+          } else if (ch == r'\') {
+            esc = true;
+          } else if (ch == '"') {
+            inStr = false;
+          }
+          continue;
+        }
+        if (ch == '"') inStr = true;
+        if (ch == '{' || ch == '[') stack.add(ch);
+        if ((ch == '}' || ch == ']') && stack.isNotEmpty) stack.removeLast();
+      }
+      if (inStr) continue;
+      final closed = head + stack.reversed.map((x) => x == '{' ? '}' : ']').join();
+      try {
+        if (asMap(jsonDecode(closed.replaceAllMapped(RegExp(r',\s*([}\]])'), (m) => m[1]!))) case final m? when (m['items'] is List)) return m;
       } catch (_) {}
     }
-    throw const AiError('Odpowiedź przyszła w złym formacie. Spróbuj jeszcze raz.');
+    return null;
+  }
+
+  /// Ostatnia deska ratunku: linie typu „- ryż: 150 g” albo „ryż – 150g, 195 kcal”.
+  static List<FoodItem> itemsFromLines(String text) {
+    final out = <FoodItem>[];
+    final re = RegExp(r'^[\s\-*•\d.)]*([A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż][^:\n\d]{1,60}?)\s*[:\-–(]?\s*(\d+(?:[.,]\d+)?)\s*(?:g|ml|gram)\b(?:[^\n\d]*(\d+(?:[.,]\d+)?)\s*kcal)?',
+        multiLine: true);
+    for (final m in re.allMatches(text)) {
+      final name = m[1]!.replaceAll(RegExp(r'["*]'), '').trim();
+      if (name.length < 2) continue;
+      final g = double.tryParse(m[2]!.replaceAll(',', '.')) ?? 0;
+      final k = m[3] == null ? 0.0 : double.tryParse(m[3]!.replaceAll(',', '.')) ?? 0;
+      if (g > 0) out.add(FoodItem(name: name, grams: g, kcal: k));
+    }
+    return out;
   }
 
   static Future<void> testKey(String k) async {
@@ -203,7 +271,19 @@ class Ai {
     final d = desc.trim();
     if (jpeg == null && d.isEmpty) throw const AiError('Dodaj zdjęcie albo opis posiłku.');
     final photo = jpeg != null;
-    final prompt = """Jesteś dietetykiem. Rozpisz posiłek na składniki z gramaturą i wartościami odżywczymi.
+    final local = await isLocal();
+    final String prompt;
+    if (local) {
+      // mały model ma okno 4096 tokenów (zdjęcie zajmuje kilkaset): krótkie polecenie, tylko nazwy i gramatury –
+      // wartości odżywcze aplikacja bierze z tabeli i bazy produktów
+      prompt = """Rozpisz posiłek na składniki z gramaturą.
+${photo ? 'Zdjęcie przedstawia posiłek.' : ''}${d.isNotEmpty ? ' Opis użytkownika (najważniejszy, produkty i ilości z opisu są pewne): "$d".' : ''}
+${draft != null ? 'Wstępnie z opisu: $draft. Popraw ilości według zdjęcia i dodaj widoczne dodatki.' : ''}
+Gramatury dla produktów w postaci zjedzonej, porcje typowe dla Polski. Nazwy krótkie, po polsku, np. "ryż biały ugotowany", "pierś z kurczaka", "surówka z marchewki".
+Odpowiedz tylko JSON-em, bez komentarzy:
+{"name":"nazwa posiłku","items":[{"name":"składnik","grams":150,"kcal":200}]}""";
+    } else {
+      prompt = """Jesteś dietetykiem. Rozpisz posiłek na składniki z gramaturą i wartościami odżywczymi.
 ${photo ? 'Masz zdjęcie posiłku.' : 'Nie ma zdjęcia, jest tylko opis.'}
 ${d.isNotEmpty ? 'Opis od użytkownika (mógł być podyktowany głosem): "$d"' : 'Użytkownik nie dodał opisu.'}
 ${d.isNotEmpty && photo ? 'Zasady: opis jest najważniejszy – produkty, ilości (sztuki, łyżki, kromki, gramy) i sposób przygotowania z opisu traktuj jako fakty. Zdjęcie służy do oszacowania wielkości porcji tego, czego ilości opis nie podaje, i do wychwycenia widocznych dodatków (sos, masło, posypka). Nie zmieniaj produktów z opisu na inne podobne.' : ''}
@@ -213,28 +293,44 @@ ${d.isEmpty ? 'Rozpoznaj składniki na zdjęciu i oszacuj gramatury po wielkośc
 Gramatury podawaj dla produktów w postaci zjedzonej (np. ugotowany ryż, pieczone mięso). Gdy składnik pasuje do jednej z tych nazw, użyj dokładnie tej nazwy: ${tableNamesForPrompt()}.
 Odpowiedz wyłącznie JSON-em, nazwy po polsku, liczby bez jednostek:
 {"name":"krótka nazwa posiłku","items":[{"name":"składnik","grams":120,"kcal":180,"protein":6,"carbs":30,"fat":4}],"confidence":"niska|średnia|wysoka","note":"jedno zdanie: co było niepewne"}""";
-    final j = parseJson(await complete(prompt, jpeg: jpeg == null ? null : Uint8List.fromList(jpeg)));
-    var items = [for (final e in (j['items'] is List ? j['items'] as List : const [])) if (e is Map) FoodItem.fromJson(Map<String, dynamic>.from(e))]
-        .where((i) => i.name.isNotEmpty)
-        .toList();
-    if (items.isEmpty) throw const AiError('Nie rozpoznano składników. Dodaj opis albo wpisz je ręcznie.');
-    // wartości odżywcze z tabeli albo z historii, gdy nazwa się zgadza – AI szacuje wtedy tylko gramaturę
+    }
+    final raw = await complete(prompt, jpeg: jpeg == null ? null : Uint8List.fromList(jpeg));
+    final j = tryParseJson(raw);
+    var items = j == null
+        ? itemsFromLines(raw)
+        : [for (final e in (j['items'] is List ? j['items'] as List : const [])) if (e is Map) FoodItem.fromJson(Map<String, dynamic>.from(e))]
+            .where((i) => i.name.isNotEmpty)
+            .toList();
+    if (items.isEmpty) {
+      throw AiError(j == null ? 'Odpowiedź modelu nie dała się odczytać.' : 'Nie rozpoznano składników. Dodaj opis albo wpisz je ręcznie.', raw);
+    }
+    // wartości odżywcze z tabeli, bazy produktów albo historii – AI szacuje wtedy tylko gramaturę
     var matched = 0;
     if (index != null) {
       items = [
         for (final i in items)
-          if (index.exact(i.name) case final r? when i.grams > 0) () {
+          if (matchFood(i.name, index) case final r? when i.grams > 0) () {
             matched++;
             return r.item(i.grams)..name = i.name;
           }() else i
       ];
     }
     final note = [
-      '${j['note'] ?? ''}'.trim(),
-      if (matched > 0) 'Wartości ${matched == items.length ? 'wszystkich składników' : '$matched z ${items.length} składników'} z tabeli i Twoich wpisów, gramatury od AI.',
+      '${j?['note'] ?? ''}'.trim(),
+      if (matched > 0) 'Wartości ${matched == items.length ? 'wszystkich składników' : '$matched z ${items.length} składników'} z tabeli i bazy produktów, gramatury od AI.',
+      if (items.any((i) => i.kcal <= 0)) 'Uzupełnij kalorie składników z zerem (wybierz nazwę z podpowiedzi).',
     ].where((x) => x.isNotEmpty).join(' ');
-    return MealGuess('${j['name'] ?? ''}', items, '${j['confidence'] ?? ''}', note);
+    return MealGuess('${j?['name'] ?? ''}', items, '${j?['confidence'] ?? ''}', note);
   }
+
+  /// Dopasowanie nazwy od AI do tabeli/bazy: najpierw dokładnie (z odmianą), potem rozpisaniem nazwy.
+  static FoodRef? matchFood(String name, FoodIndex index) {
+    if (index.exact(name) case final r?) return r;
+    final p = parseDescription(name, index);
+    if (p.items.length == 1 && p.unknown.isEmpty) return p.items.first.ref;
+    return null;
+  }
+
 
   /// Zamienia podyktowany opis samopoczucia trawiennego na pola formularza.
   static Future<GutGuess> parseGut(String said) async {

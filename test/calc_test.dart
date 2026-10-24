@@ -298,6 +298,19 @@ void main() {
   });
 
   test('JSON z odpowiedzi AI', () {
+    // odpowiedzi małego modelu: ucięta, z przecinkami na końcu, polskie liczby, sama lista, linie
+    final cut = Ai.tryParseJson('```json\n{"name":"Obiad","items":[{"name":"ryż","grams":150,"kcal":195},{"name":"kurczak","grams":12');
+    expect(cut!['items'], hasLength(1));
+    expect(Ai.tryParseJson('{"items":[{"name":"jajko","grams": 1,5 ,"kcal":90,},]}')!['items'][0]['grams'], 1.5);
+    expect(Ai.tryParseJson('[{"name":"banan","grams":120}]')!['items'], hasLength(1));
+    expect(Ai.tryParseJson('{"items":[{"name":"chleb","grams":"70 g"}]}'), isNotNull);
+    expect(Ai.tryParseJson('Nie widzę jedzenia.'), isNull);
+    final lines = Ai.itemsFromLines('Na talerzu:\n- ziemniaki: 200 g\n- kotlet schabowy – 150g (430 kcal)\n');
+    expect(lines.map((i) => i.name), ['ziemniaki', 'kotlet schabowy']);
+    expect(lines[1].kcal, 430);
+    final idx = FoodIndex.build(const []);
+    expect(Ai.matchFood('Ziemniaki gotowane', idx)!.name, 'ziemniaki gotowane');
+    expect(Ai.matchFood('pierś z kurczaka', idx)!.name, 'pierś z kurczaka pieczona');
     expect(Ai.parseJson('```json\n{"a":1}\n```')['a'], 1);
     expect(Ai.parseJson('Oto wynik: {"name":"x","items":[]} gotowe')['name'], 'x');
     expect(() => Ai.parseJson('brak'), throwsA(isA<AiError>()));

@@ -127,6 +127,7 @@ class _MealFormState extends State<MealForm> {
   bool aiLocal = false;
   String aiHint = '';
   String? aiNote;
+  String? lastRaw; // nieczytelna odpowiedź modelu do podglądu
   String? status;
   bool statusErr = false;
 
@@ -316,6 +317,7 @@ class _MealFormState extends State<MealForm> {
       return;
     }
     setState(() => busy = true);
+    lastRaw = null;
     _status(aiLocal ? 'Model na telefonie analizuje posiłek… (to może potrwać do minuty)' : 'Claude analizuje posiłek…');
     try {
       final draft = desc.text.trim().isEmpty ? null : parseDescription(desc.text, index);
@@ -333,11 +335,27 @@ class _MealFormState extends State<MealForm> {
       aiNote = [if (g.confidence.isNotEmpty) 'Pewność rozpoznania: ${g.confidence}.', if (g.note.isNotEmpty) g.note].join(' ');
       _status('Sprawdź gramatury i popraw, jeśli trzeba.');
     } on AiError catch (e) {
-      _status(e.message, err: true);
+      lastRaw = e.raw;
+      if (e.raw != null && desc.text.trim().isNotEmpty && items.isEmpty) {
+        // model odpowiedział nieczytelnie, ale jest opis – rozpisujemy go z bazy
+        _fromDescription();
+        _status('${e.message} Rozpisałem opis z bazy produktów – sprawdź ilości.', err: true);
+      } else {
+        _status(e.message, err: true);
+      }
     } finally {
       if (mounted) setState(() => busy = false);
     }
   }
+
+  void _showRaw() => showDialog<void>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('Odpowiedź modelu'),
+          content: SingleChildScrollView(child: SelectableText(lastRaw ?? '', style: const TextStyle(fontFamily: 'monospace', fontSize: 12.5))),
+          actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('Zamknij'))],
+        ),
+      );
 
   Future<void> _save() async {
     final its = items.map((c) => c.item).where((i) => i.name.isNotEmpty).toList();
@@ -473,6 +491,8 @@ class _MealFormState extends State<MealForm> {
           ),
         if (status != null)
           Padding(padding: const EdgeInsets.only(top: 8), child: Text(status!, style: TextStyle(color: statusErr ? cs.error : cs.onSurfaceVariant))),
+        if (statusErr && lastRaw != null && lastRaw!.isNotEmpty)
+          Align(alignment: Alignment.centerLeft, child: TextButton(onPressed: _showRaw, child: const Text('Pokaż odpowiedź modelu'))),
         const SizedBox(height: 12),
         TextField(controller: name, textCapitalization: TextCapitalization.sentences, decoration: const InputDecoration(labelText: 'Nazwa posiłku', hintText: 'np. Owsianka z bananem')),
         SectionTitle('Składniki', trailing: TextButton.icon(onPressed: () => setState(() => items.add(_ItemCtl())), icon: const Icon(Icons.add), label: const Text('Składnik'))),

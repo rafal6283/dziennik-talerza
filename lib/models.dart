@@ -11,7 +11,12 @@ String newId([String prefix = '']) {
 }
 
 int _i(dynamic v) => v is num ? v.round() : int.tryParse('${v ?? ''}') ?? 0;
-double _d(dynamic v) => v is num ? v.toDouble() : double.tryParse('${v ?? ''}'.replaceAll(',', '.')) ?? 0;
+double _d(dynamic v) {
+  if (v is num) return v.toDouble();
+  // „70 g”, „1,5”, „ok. 120” → liczba
+  final m = RegExp(r'-?\d+(?:[.,]\d+)?').firstMatch('${v ?? ''}');
+  return m == null ? 0 : double.tryParse(m[0]!.replaceAll(',', '.')) ?? 0;
+}
 String _s(dynamic v) => v == null ? '' : '$v';
 
 Map<String, dynamic> _rest(Map<String, dynamic> j, Set<String> known) =>
