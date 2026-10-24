@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../ai.dart';
 import '../calc.dart';
+import '../health.dart';
 import '../local_ai.dart';
 import '../main.dart';
 import '../security/lock.dart';
@@ -25,6 +26,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String model = aiModels.first.$1;
   String provider = 'local';
   bool localReady = false;
+
+  String _hcName() =>
+      app.people.firstWhere((p) => p.id == HealthSync.person, orElse: () => app.active).name;
+
+  void _snack(String t) {
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t)));
+  }
+
+  Future<void> _setHealth(bool on) async {
+    if (!on) {
+      await HealthSync.configure(on: false);
+      if (mounted) setState(() {});
+      return;
+    }
+    final status = await HealthSync.status();
+    if (status == 'unavailable') {
+      _snack('Health Connect nie jest dostępne na tym telefonie');
+      return;
+    }
+    final ok = await HealthSync.requestPermission();
+    if (!ok) {
+      _snack(status == 'update'
+          ? 'Zainstaluj lub zaktualizuj Health Connect ze Sklepu Play i włącz ponownie'
+          : 'Bez zgody na zapis odżywiania w Health Connect nie da się tego włączyć');
+      return;
+    }
+    await HealthSync.configure(on: true, person: app.active.id);
+    if (mounted) setState(() {});
+    final n = await HealthSync.writeMeals(app.allMeals.where((m) => m.person == app.active.id && m.total.kcal > 0));
+    _snack(n < 0 ? 'Nie udało się zapisać posiłków' : 'Zapisano w Health Connect posiłków: $n');
+  }
 
   @override
   void initState() {
@@ -238,6 +270,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
             if (mounted) setState(() {});
           },
         ),
+        if (HealthSync.supported) ...[
+          SwitchListTile(
+            secondary: const Icon(Icons.favorite_border),
+            title: const Text('Posiłki do Health Connect'),
+            subtitle: Text(HealthSync.enabled
+                ? 'Kalorie i makro osoby „${_hcName()}” trafiają do Health Connect – zobaczysz je w Samsung Health czy Google Fit'
+                : 'Kalorie, białko, węglowodany i tłuszcz z każdego posiłku – dla Samsung Health, Google Fit itp.'),
+            value: HealthSync.enabled,
+            onChanged: _setHealth,
+          ),
+          if (HealthSync.enabled && app.people.length > 1 && HealthSync.person != app.active.id)
+            ListTile(
+              leading: const Icon(Icons.person_outline),
+              title: Text('Wysyłaj posiłki osoby „${app.active.name}”'),
+              subtitle: Text('Teraz: „${_hcName()}”. Health Connect należy do właściciela telefonu – wybierz jedną osobę.'),
+              onTap: () async {
+                final old = HealthSync.person;
+                await HealthSync.configure(on: true, person: app.active.id);
+                await HealthSync.deleteMeals([for (final m in app.allMeals) if (m.person == old) m.id]);
+                final n = await HealthSync.writeMeals(app.allMeals.where((m) => m.person == app.active.id && m.total.kcal > 0));
+                _snack(n < 0 ? 'Nie udało się zapisać posiłków' : 'Zapisano w Health Connect posiłków: $n');
+                if (mounted) setState(() {});
+              },
+            ),
+        ],
         const SectionTitle('Dane'),
         ListTile(
           leading: const Icon(Icons.file_download_outlined),

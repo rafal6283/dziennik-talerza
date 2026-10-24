@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'food_pack.dart';
+import 'health.dart';
 import 'security/lock.dart';
 import 'store.dart';
 import 'ui/format.dart';
@@ -26,6 +27,10 @@ Future<T> withExternal<T>(Future<T> Function() f) async {
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   FoodPack.load(); // paczka produktów wczytuje się w tle
+  // posiłki wybranej osoby → Health Connect (Samsung Health, Google Fit)
+  HealthSync.init();
+  app.onMealSaved = HealthSync.mealSaved;
+  app.onMealDeleted = HealthSync.mealDeleted;
   runApp(const DziennikApp());
 }
 

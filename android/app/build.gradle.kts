@@ -59,3 +59,10 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // Posiłki → Health Connect (Samsung Health, Google Fit)
+    implementation("androidx.health.connect:connect-client:1.1.0-alpha07")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("androidx.activity:activity-ktx:1.9.3")
+}

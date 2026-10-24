@@ -18,6 +18,10 @@ class ImportSummary {
 }
 
 class AppState extends ChangeNotifier {
+  /// Wywoływane po zapisie / usunięciu posiłku (np. synchronizacja z Health Connect).
+  Future<void> Function(Meal m)? onMealSaved;
+  Future<void> Function(String id)? onMealDeleted;
+
   List<Person> people = [Person(id: 'me', name: 'Ja')];
   String activeId = 'me';
   List<Meal> allMeals = [];
@@ -234,6 +238,7 @@ class AppState extends ChangeNotifier {
       allMeals.add(m);
     }
     await _commit();
+    onMealSaved?.call(m); // w tle — zapis w dzienniku nie czeka na Health Connect
   }
 
   Future<void> deleteMeal(String id) async {
@@ -244,6 +249,7 @@ class AppState extends ChangeNotifier {
       g.suspects.remove(id);
     }
     await _commit();
+    onMealDeleted?.call(id);
   }
 
   Future<void> addReaction(String mealId, Reaction r) async {
