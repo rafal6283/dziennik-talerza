@@ -13,7 +13,9 @@ OUT = 'assets/off_pl.json.gz'
 SRC = 'hf://datasets/openfoodfacts/product-database/food.parquet'
 
 con = duckdb.connect()
-print(con.sql(f"DESCRIBE SELECT * FROM read_parquet('{SRC}')").fetchall(), flush=True)
+for col in con.sql(f"DESCRIBE SELECT * FROM read_parquet('{SRC}')").fetchall():
+    if col[0] in ('product_name', 'nutriments', 'countries_tags', 'serving_quantity', 'unique_scans_n', 'lang', 'brands'):
+        print(col[0], col[1], flush=True)
 
 t0 = time.time()
 sql = f"""
@@ -24,16 +26,16 @@ WITH pl AS (
   WHERE list_contains(countries_tags, 'en:poland')
 )
 SELECT
-  coalesce(list_filter(product_name, x -> x.lang = 'pl')[1].text,
-           list_filter(product_name, x -> x.lang = 'main')[1].text,
+  coalesce(list_filter(product_name, lambda x: x.lang = 'pl')[1].text,
+           list_filter(product_name, lambda x: x.lang = 'main')[1].text,
            product_name[1].text) AS name,
-  list_filter(product_name, x -> x.lang = 'pl')[1].text IS NOT NULL OR lang = 'pl' AS polish,
+  list_filter(product_name, lambda x: x.lang = 'pl')[1].text IS NOT NULL OR lang = 'pl' AS polish,
   brands,
-  list_filter(nutriments, x -> x.name = 'energy-kcal')[1]."100g" AS kcal,
-  list_filter(nutriments, x -> x.name = 'energy')[1]."100g" AS kj,
-  list_filter(nutriments, x -> x.name = 'proteins')[1]."100g" AS prot,
-  list_filter(nutriments, x -> x.name = 'carbohydrates')[1]."100g" AS carb,
-  list_filter(nutriments, x -> x.name = 'fat')[1]."100g" AS fat,
+  list_filter(nutriments, lambda x: x.name = 'energy-kcal')[1]."100g" AS kcal,
+  list_filter(nutriments, lambda x: x.name = 'energy')[1]."100g" AS kj,
+  list_filter(nutriments, lambda x: x.name = 'proteins')[1]."100g" AS prot,
+  list_filter(nutriments, lambda x: x.name = 'carbohydrates')[1]."100g" AS carb,
+  list_filter(nutriments, lambda x: x.name = 'fat')[1]."100g" AS fat,
   serving_quantity,
   coalesce(unique_scans_n, 0) AS scans
 FROM pl
