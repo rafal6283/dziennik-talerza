@@ -1,0 +1,36 @@
+name: Paczka produktów (Open Food Facts PL)
+
+on:
+  push:
+    branches: [main]
+    paths: ['tool/off_pack.py', '.github/workflows/food-pack.yml']
+  schedule:
+    - cron: '17 3 1 * *'   # raz w miesiącu
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - name: Pobierz produkty
+        run: |
+          mkdir -p assets
+          python3 tool/off_pack.py 150 2>&1 | tee pack.log
+      - name: Zapisz w repo
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add assets/off_pl.json.gz
+          git diff --cached --quiet && exit 0
+          git commit -m "Paczka produktów Open Food Facts PL ($(date -u +%F))"
+          git pull --rebase origin main && git push
+      - name: Logi (gałąź ci-pack)
+        if: always()
+        run: bash .github/push_logs.sh ci-pack pack.log
+        env:
+          TOKEN: ${{ github.token }}
