@@ -239,6 +239,9 @@ void main() {
         ['Prince Polo classic', 'Olza', 523, 5.7, 60, 28, 35],
       ],
     })));
+    expect(FoodPack.cleanBrand('MARS POLSKA SPÓŁKA Z OGRANICZONĄ ODPOWIE'), 'Mars');
+    expect(FoodPack.cleanBrand('COCA-COLA SERVICES SA/NV'), 'Coca-Cola');
+    expect(FoodPack.cleanBrand('Piątnica'), 'Piątnica');
     final pack = FoodPack.decode(gz);
     expect(pack.length, 2);
     expect(pack[1].display, 'Prince Polo classic (Olza)');
