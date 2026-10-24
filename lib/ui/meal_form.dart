@@ -5,12 +5,20 @@ import 'package:image_picker/image_picker.dart';
 
 import '../ai.dart';
 import '../calc.dart';
+import '../food_table.dart';
 import '../main.dart';
 import '../models.dart';
 import 'barcode.dart';
 import 'format.dart';
 import 'home.dart' show MealPhoto;
 import 'voice.dart';
+
+String _fmtKcal(double v) => v <= 0 ? '' : v.round().toString();
+String _fmtMacro(double v) {
+  if (v <= 0) return '';
+  if (v >= 10) return v.round().toString();
+  return v.toStringAsFixed(1).replaceAll('.', ',').replaceFirst(RegExp(r',0$'), '');
+}
 
 class _ItemCtl {
   final name = TextEditingController();
@@ -19,15 +27,64 @@ class _ItemCtl {
   final p = TextEditingController();
   final c = TextEditingController();
   final f = TextEditingController();
+  final focus = FocusNode();
+  /// Wartości na 100 g – przy zmianie gramatury kcal i makro przeliczają się same.
+  Macros? per100;
+  FoodRef? ref; // wybrana podpowiedź (porcja do szybkich przycisków)
+
   _ItemCtl([FoodItem? i]) {
     if (i == null) return;
     name.text = i.name;
     grams.text = numInput(i.grams);
-    kcal.text = numInput(i.kcal);
-    p.text = numInput(i.protein);
-    c.text = numInput(i.carbs);
-    f.text = numInput(i.fat);
+    kcal.text = _fmtKcal(i.kcal);
+    p.text = _fmtMacro(i.protein);
+    c.text = _fmtMacro(i.carbs);
+    f.text = _fmtMacro(i.fat);
+    _derivePer100();
   }
+
+  double get g => parseNum(grams.text) ?? 0;
+
+  void _derivePer100() {
+    final gg = g;
+    if (gg <= 0) {
+      per100 = null;
+      return;
+    }
+    final it = item;
+    per100 = Macros(it.kcal * 100 / gg, it.protein * 100 / gg, it.carbs * 100 / gg, it.fat * 100 / gg);
+  }
+
+  /// Zmieniono gramaturę: przelicz wartości z bazy na 100 g.
+  void gramsChanged() {
+    final b = per100;
+    if (b == null) {
+      _derivePer100();
+      return;
+    }
+    final k = g / 100;
+    kcal.text = _fmtKcal(b.kcal * k);
+    p.text = _fmtMacro(b.p * k);
+    c.text = _fmtMacro(b.c * k);
+    f.text = _fmtMacro(b.f * k);
+  }
+
+  /// Zmieniono kcal lub makro ręcznie: to staje się nową bazą na 100 g.
+  void macroChanged() => _derivePer100();
+
+  void apply(FoodRef r) {
+    ref = r;
+    name.text = r.name;
+    per100 = Macros(r.kcal, r.protein, r.carbs, r.fat);
+    if (g <= 0) grams.text = numInput(r.portion);
+    gramsChanged();
+  }
+
+  void setGrams(double v) {
+    grams.text = numInput(v);
+    gramsChanged();
+  }
+
   FoodItem get item => FoodItem(
         name: name.text.trim(),
         grams: parseNum(grams.text) ?? 0,
@@ -40,6 +97,7 @@ class _ItemCtl {
     for (final x in [name, grams, kcal, p, c, f]) {
       x.dispose();
     }
+    focus.dispose();
   }
 }
 
@@ -56,6 +114,7 @@ class _MealFormState extends State<MealForm> {
   final desc = TextEditingController();
   final name = TextEditingController();
   final items = <_ItemCtl>[];
+  late final FoodIndex index = FoodIndex.build(app.allMeals);
   late String date;
   late String time;
   late String type;
@@ -129,11 +188,71 @@ class _MealFormState extends State<MealForm> {
       if (x == null) return;
       final b = await x.readAsBytes();
       setState(() => newPhoto = b);
-      if (aiOn && items.isEmpty) await _recognize();
+      if (!aiOn || items.isNotEmpty || !mounted) return;
+      // opis znacznie poprawia rozpoznanie – pytamy o niego od razu
+      if (desc.text.trim().isEmpty) {
+        final go = await _askDescription();
+        if (go != true) return;
+      }
+      await _recognize();
     } catch (e) {
       _status('Nie udało się pobrać zdjęcia. Sprawdź uprawnienia aparatu i zdjęć.', err: true);
     }
   }
+
+  /// Arkusz po zrobieniu zdjęcia: krótki opis (pisany lub dyktowany) przed rozpoznaniem.
+  Future<bool?> _askDescription() => showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (c) => Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + MediaQuery.of(c).viewInsets.bottom),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('Co jest na talerzu?', style: Theme.of(c).textTheme.titleLarge),
+            const SizedBox(height: 4),
+            Text('Kilka słów wystarczy, np. „ryż, pierś z kurczaka, surówka z marchewki” albo „2 jajka sadzone na maśle”. '
+                'AI weźmie produkty i ilości z opisu, a ze zdjęcia oszacuje porcje.',
+                style: TextStyle(color: Theme.of(c).colorScheme.onSurfaceVariant)),
+            const SizedBox(height: 14),
+            TextField(
+              controller: desc,
+              autofocus: true,
+              minLines: 2,
+              maxLines: 4,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                labelText: 'Opis',
+                suffixIcon: IconButton(
+                  tooltip: 'Dyktuj',
+                  icon: const Icon(Icons.mic_none),
+                  onPressed: () async {
+                    final t = await dictate(c, title: 'Co jest na talerzu?');
+                    if (t == null || t.isEmpty) return;
+                    final cur = desc.text.trim();
+                    desc.text = cur.isEmpty ? t : '$cur $t';
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(children: [
+              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Później')),
+              const Spacer(),
+              OutlinedButton(
+                onPressed: () {
+                  desc.clear();
+                  Navigator.pop(c, true);
+                },
+                child: const Text('Bez opisu'),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.icon(onPressed: () => Navigator.pop(c, true), icon: const Icon(Icons.auto_awesome, size: 18), label: const Text('Rozpoznaj')),
+            ]),
+          ]),
+        ),
+      ).whenComplete(() {
+        if (mounted) setState(() {});
+      });
 
   Future<void> _scan() async {
     final it = await scanFood(context);
@@ -162,10 +281,8 @@ class _MealFormState extends State<MealForm> {
     setState(() => busy = true);
     _status(aiLocal ? 'Model na telefonie analizuje posiłek… (to może potrwać do minuty)' : 'Claude analizuje posiłek…');
     try {
-      final g = await Ai.recognizeMeal(jpeg: newPhoto, desc: desc.text);
-      for (final i in items) {
-        i.dispose();
-      }
+      final g = await Ai.recognizeMeal(jpeg: newPhoto, desc: desc.text, index: index);
+      _disposeLater([...items]);
       items
         ..clear()
         ..addAll(g.items.map(_ItemCtl.new));
@@ -334,37 +451,98 @@ class _MealFormState extends State<MealForm> {
     );
   }
 
+  /// Kontrolery zwalniamy po klatce, gdy pola już zniknęły z ekranu.
+  void _disposeLater(Iterable<_ItemCtl> xs) {
+    final list = xs.toList();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (final x in list) {
+        x.dispose();
+      }
+    });
+  }
+
+  void _removeItem(int i) {
+    final x = items.removeAt(i);
+    setState(() {});
+    _disposeLater([x]);
+  }
+
   Widget _itemRow(int i, _ItemCtl c) {
-    Widget num(TextEditingController ctl, String label) => Expanded(
+    final cs = Theme.of(context).colorScheme;
+    Widget num(TextEditingController ctl, String label, {bool isGrams = false}) => Expanded(
           child: TextField(
             controller: ctl,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             textAlign: TextAlign.right,
-            style: const TextStyle(fontFeatures: tabular),
+            style: TextStyle(fontFeatures: tabular, fontWeight: isGrams ? FontWeight.w700 : null),
             decoration: InputDecoration(labelText: label, contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10)),
-            onChanged: (_) => setState(() {}),
+            onChanged: (_) => setState(() {
+              if (isGrams) {
+                c.gramsChanged();
+              } else {
+                c.macroChanged();
+              }
+            }),
           ),
         );
+    final b = c.per100;
+    final r = c.ref;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(children: [
+      key: ObjectKey(c),
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Expanded(
-            child: TextField(
-              controller: c.name,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: InputDecoration(labelText: 'Składnik ${i + 1}'),
+            child: RawAutocomplete<FoodRef>(
+              textEditingController: c.name,
+              focusNode: c.focus,
+              displayStringForOption: (o) => o.name,
+              optionsBuilder: (v) => index.search(v.text),
+              onSelected: (o) => setState(() => c.apply(o)),
+              fieldViewBuilder: (context, ctl, focus, onSubmit) => TextField(
+                controller: ctl,
+                focusNode: focus,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: InputDecoration(labelText: 'Składnik ${i + 1}', hintText: 'zacznij pisać, np. chleb, jajko, ryż'),
+                onSubmitted: (_) => onSubmit(),
+              ),
+              optionsViewBuilder: (context, onSelect, options) => Align(
+                alignment: Alignment.topLeft,
+                child: Material(
+                  elevation: 6,
+                  borderRadius: BorderRadius.circular(12),
+                  clipBehavior: Clip.antiAlias,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: 300, maxWidth: MediaQuery.of(context).size.width - 80),
+                    child: ListView(
+                      padding: EdgeInsets.zero,
+                      shrinkWrap: true,
+                      children: [
+                        for (final o in options)
+                          ListTile(
+                            dense: true,
+                            title: Text(o.name),
+                            subtitle: Text('${o.kcal.round()} kcal · B ${_fmtMacro(o.protein).isEmpty ? '0' : _fmtMacro(o.protein)} · W ${_fmtMacro(o.carbs).isEmpty ? '0' : _fmtMacro(o.carbs)} · T ${_fmtMacro(o.fat).isEmpty ? '0' : _fmtMacro(o.fat)} na 100 g',
+                                style: const TextStyle(fontFeatures: tabular)),
+                            trailing: o.mine ? const Chip2('Twoje') : null,
+                            onTap: () => onSelect(o),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
           IconButton(
             tooltip: 'Usuń składnik',
             icon: const Icon(Icons.close),
-            onPressed: () => setState(() => items.removeAt(i).dispose()),
+            onPressed: () => _removeItem(i),
           ),
         ]),
         const SizedBox(height: 6),
         Row(children: [
-          num(c.grams, 'g'),
+          num(c.grams, 'g', isGrams: true),
           const SizedBox(width: 6),
           num(c.kcal, 'kcal'),
           const SizedBox(width: 6),
@@ -375,6 +553,20 @@ class _MealFormState extends State<MealForm> {
           num(c.f, 'T'),
           const SizedBox(width: 48),
         ]),
+        if (b != null || r != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+              if (b != null) Text('${b.kcal.round()} kcal/100 g', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+              if (r != null && r.portion > 0)
+                for (final n in const [0.5, 1.0, 2.0])
+                  ActionChip(
+                    visualDensity: VisualDensity.compact,
+                    label: Text('${n == 0.5 ? '½' : n.round()} × ${r.portionLabel} (${(r.portion * n).round()} g)', style: const TextStyle(fontSize: 12)),
+                    onPressed: () => setState(() => c.setGrams(r.portion * n)),
+                  ),
+            ]),
+          ),
       ]),
     );
   }

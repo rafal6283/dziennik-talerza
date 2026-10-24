@@ -6,6 +6,8 @@ Prywatna aplikacja na Androida i iPhone'a (Flutter): co jem, ile to kalorii i ja
 
 - **Kilka osób** z osobnymi dziennikami i profilami: płeć, rok urodzenia, wzrost, waga, aktywność, cel (utrzymanie, redukcja, masa), uwagi (dieta, nietolerancje, leki). Z profilu liczony jest cel kalorii (Mifflin-St Jeor × aktywność) i białka.
 - **Posiłki**: zdjęcie z aparatu lub galerii, opis (także dyktowany), składniki z gramaturą, kcal, B/W/T. Edycja, „zjedz ponownie dziś”.
+- **Podpowiedzi składników** w trakcie pisania: Twoje wcześniejsze wpisy i wbudowana tabela ok. 230 produktów i dań (wartości na 100 g, typowe porcje). Zmiana gramatury od razu przelicza kcal i makro.
+- **Rozpoznawanie ze zdjęcia wspierane opisem**: po zrobieniu zdjęcia aplikacja pyta o kilka słów (pisanych lub dyktowanych); produkty i ilości z opisu mają pierwszeństwo, a wartości odżywcze składników, które są w tabeli, liczone są z tabeli.
 - **Rozpoznawanie AI za darmo, na telefonie**: model Gemma 4 E2B (jednorazowe pobranie 2,6 GB) rozpoznaje składniki ze zdjęcia lub opisu i szacuje wartości odżywcze – bez internetu, konta i opłat. Opcjonalnie zamiast niego Claude z własnym kluczem API (dokładniejszy, płatny).
 - **Skaner kodów kreskowych**: wartości z etykiety z darmowej bazy Open Food Facts.
 - **Jak się czujesz po**: energia, sytość, objawy, notatka, po ilu godzinach.

@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:dziennik_talerza/ai.dart';
 import 'package:dziennik_talerza/calc.dart';
 import 'package:dziennik_talerza/food_db.dart';
+import 'package:dziennik_talerza/food_table.dart';
 import 'package:dziennik_talerza/models.dart';
 import 'package:dziennik_talerza/store.dart';
 
@@ -120,6 +121,26 @@ void main() {
     expect(shiftDay('2026-03-01', -1), '2026-02-28');
     expect(shiftDay('2026-12-31', 1), '2027-01-01');
     expect(shiftDay('2026-03-29', 1), '2026-03-30'); // zmiana czasu
+  });
+
+  test('podpowiedzi składników', () {
+    final idx = FoodIndex.build([
+      meal('h1', '2026-10-20', '08:00', ['Chleb żytni domowy']),
+    ]);
+    expect(foodTable().length, greaterThan(200));
+    final r = idx.search('chleb');
+    expect(r.first.name, 'Chleb żytni domowy'); // własne wpisy na górze
+    expect(r.first.mine, isTrue);
+    expect(r.first.kcal, closeTo(200, 0.01)); // 200 kcal na 100 g z historii
+    expect(idx.search('ser zolty').first.name, 'ser żółty'); // bez polskich znaków
+    expect(idx.search('jaj').first.name, startsWith('jaj'));
+    expect(idx.search('kur pier').map((x) => x.name), contains('pierś z kurczaka pieczona'));
+    expect(idx.search('x'), isEmpty);
+    final egg = idx.exact('Jajka')!;
+    expect(egg.name, 'jajko');
+    final it = egg.item(120);
+    expect(it.kcal, closeTo(168, 0.01));
+    expect(normalizeFood('Żółć, ŁÓDŹ!'), 'zolc, lodz');
   });
 
   test('produkt z Open Food Facts', () {

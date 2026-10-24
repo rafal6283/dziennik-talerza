@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'calc.dart';
+import 'food_table.dart';
 import 'local_ai.dart';
 import 'models.dart';
 
@@ -197,19 +198,40 @@ class Ai {
     ], maxTokens: 10, keyOverride: k);
   }
 
-  static Future<MealGuess> recognizeMeal({List<int>? jpeg, String desc = ''}) async {
-    if (jpeg == null && desc.trim().isEmpty) throw const AiError('Dodaj zdjęcie albo opis posiłku.');
-    final prompt = '''Jesteś dietetykiem szacującym wartości odżywcze posiłku.${jpeg != null ? ' Na zdjęciu jest posiłek.' : ''}
-${desc.trim().isNotEmpty ? 'Opis od użytkownika (mógł być podyktowany głosem): ${desc.trim()}' : 'Brak opisu.'}
-Rozpoznaj składniki, oszacuj realistyczne gramatury (porcje typowe dla Polski) i wartości odżywcze każdego składnika. Jeśli opis kłóci się ze zdjęciem, ufaj opisowi.
-Odpowiedz wyłącznie JSON-em w tym kształcie, nazwy po polsku, liczby bez jednostek:
-{"name":"krótka nazwa posiłku","items":[{"name":"składnik","grams":120,"kcal":180,"protein":6,"carbs":30,"fat":4}],"confidence":"niska|średnia|wysoka","note":"jedno zdanie: co było niepewne"}''';
+  static Future<MealGuess> recognizeMeal({List<int>? jpeg, String desc = '', FoodIndex? index}) async {
+    final d = desc.trim();
+    if (jpeg == null && d.isEmpty) throw const AiError('Dodaj zdjęcie albo opis posiłku.');
+    final photo = jpeg != null;
+    final prompt = """Jesteś dietetykiem. Rozpisz posiłek na składniki z gramaturą i wartościami odżywczymi.
+${photo ? 'Masz zdjęcie posiłku.' : 'Nie ma zdjęcia, jest tylko opis.'}
+${d.isNotEmpty ? 'Opis od użytkownika (mógł być podyktowany głosem): "$d"' : 'Użytkownik nie dodał opisu.'}
+${d.isNotEmpty && photo ? 'Zasady: opis jest najważniejszy – produkty, ilości (sztuki, łyżki, kromki, gramy) i sposób przygotowania z opisu traktuj jako fakty. Zdjęcie służy do oszacowania wielkości porcji tego, czego ilości opis nie podaje, i do wychwycenia widocznych dodatków (sos, masło, posypka). Nie zmieniaj produktów z opisu na inne podobne.' : ''}
+${d.isNotEmpty && !photo ? 'Zasady: produkty i ilości z opisu traktuj jako fakty; gdy ilości brak, przyjmij typową porcję w Polsce.' : ''}
+${d.isEmpty ? 'Rozpoznaj składniki na zdjęciu i oszacuj gramatury po wielkości talerza i sztućców (porcje typowe dla Polski).' : ''}
+Gramatury podawaj dla produktów w postaci zjedzonej (np. ugotowany ryż, pieczone mięso). Gdy składnik pasuje do jednej z tych nazw, użyj dokładnie tej nazwy: ${tableNamesForPrompt()}.
+Odpowiedz wyłącznie JSON-em, nazwy po polsku, liczby bez jednostek:
+{"name":"krótka nazwa posiłku","items":[{"name":"składnik","grams":120,"kcal":180,"protein":6,"carbs":30,"fat":4}],"confidence":"niska|średnia|wysoka","note":"jedno zdanie: co było niepewne"}""";
     final j = parseJson(await complete(prompt, jpeg: jpeg == null ? null : Uint8List.fromList(jpeg)));
-    final items = [for (final e in (j['items'] is List ? j['items'] as List : const [])) if (e is Map) FoodItem.fromJson(Map<String, dynamic>.from(e))]
+    var items = [for (final e in (j['items'] is List ? j['items'] as List : const [])) if (e is Map) FoodItem.fromJson(Map<String, dynamic>.from(e))]
         .where((i) => i.name.isNotEmpty)
         .toList();
     if (items.isEmpty) throw const AiError('Nie rozpoznano składników. Dodaj opis albo wpisz je ręcznie.');
-    return MealGuess('${j['name'] ?? ''}', items, '${j['confidence'] ?? ''}', '${j['note'] ?? ''}');
+    // wartości odżywcze z tabeli albo z historii, gdy nazwa się zgadza – AI szacuje wtedy tylko gramaturę
+    var matched = 0;
+    if (index != null) {
+      items = [
+        for (final i in items)
+          if (index.exact(i.name) case final r? when i.grams > 0) () {
+            matched++;
+            return r.item(i.grams)..name = i.name;
+          }() else i
+      ];
+    }
+    final note = [
+      '${j['note'] ?? ''}'.trim(),
+      if (matched > 0) 'Wartości ${matched == items.length ? 'wszystkich składników' : '$matched z ${items.length} składników'} z tabeli i Twoich wpisów, gramatury od AI.',
+    ].where((x) => x.isNotEmpty).join(' ');
+    return MealGuess('${j['name'] ?? ''}', items, '${j['confidence'] ?? ''}', note);
   }
 
   /// Zamienia podyktowany opis samopoczucia trawiennego na pola formularza.
