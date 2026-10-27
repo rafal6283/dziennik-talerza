@@ -179,6 +179,13 @@ class AppState extends ChangeNotifier {
     return s;
   }
 
+  /// Przywrócenie kopii: zastępuje wszystkie dane (zdjęcia podmienia wcześniej wywołujący).
+  Future<ImportSummary> replaceFromBytes(List<int> bytes) async {
+    final s = _apply(jsonDecode(utf8.decode(bytes)), replace: true);
+    await _commit();
+    return s;
+  }
+
   Future<String> savePhoto(List<int> bytes) async {
     final name = '${newId('f')}.jpg';
     await File('${(await _photoDir()).path}/$name').writeAsBytes(bytes, flush: true);

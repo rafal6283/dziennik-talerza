@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:koofr_backup_ui/koofr_backup_ui.dart' show KoofrBackupTile;
 
 import '../ai.dart';
 import '../calc.dart';
@@ -296,6 +297,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
         ],
         const SectionTitle('Dane'),
+        const KoofrBackupTile(),
         ListTile(
           leading: const Icon(Icons.file_download_outlined),
           title: const Text('Importuj kopię'),

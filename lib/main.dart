@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:koofr_backup_ui/koofr_backup_ui.dart' show KoofrBackup;
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'koofr_backup.dart';
 import 'food_pack.dart';
 import 'health.dart';
 import 'security/lock.dart';
@@ -91,6 +93,8 @@ class _LockGateState extends State<LockGate> with WidgetsBindingObserver {
 
   Future<void> _load() async {
     final results = await Future.wait([Lock.load(), app.load()]);
+    // kopia na Koofr w tle (po wczytaniu danych)
+    KoofrBackup.setup(DziennikBackup()).ignore();
     final c = results.first as LockConfig;
     if (!mounted) return;
     setState(() {
