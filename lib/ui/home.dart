@@ -293,9 +293,9 @@ class _GutCard extends StatelessWidget {
           return Padding(
             padding: const EdgeInsets.only(top: 10),
             child: Row(children: [
-              Icon(Icons.air, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              Icon(Icons.timeline, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
               const SizedBox(width: 8),
-              Expanded(child: Text('Wiatry · ${parts.join(' · ')}', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13))),
+              Expanded(child: Text('FF · ${parts.join(' · ')}', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13))),
             ]),
           );
         }),

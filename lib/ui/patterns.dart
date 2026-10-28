@@ -145,7 +145,7 @@ class _PatternsTabState extends State<PatternsTab> {
       if (gs.any)
         Panel(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            title('Wiatry'),
+            title('FF'),
             muted([
               if (gs.kreska != null) 'Kreska: licznik „${gs.kreska!.label}” (w ciągu dnia)',
               if (gs.night != null) 'Rytm Snu (w nocy)',
@@ -168,11 +168,11 @@ class _PatternsTabState extends State<PatternsTab> {
                 Row(mainAxisSize: MainAxisSize.min, children: [Container(width: 10, height: 10, color: cs.tertiary), const SizedBox(width: 4), muted('noc po tym dniu')]),
             ]),
             const SizedBox(height: 14),
-            Text('Po czym więcej wiatrów', style: const TextStyle(fontWeight: FontWeight.w600)),
-            muted('Średnia liczba wiatrów (${gs.outcomeLabel}) po dniach, w które jadłeś dany składnik, wobec średniej ze wszystkich dni.'),
+            Text('Po czym więcej FF', style: const TextStyle(fontWeight: FontWeight.w600)),
+            muted('Średnia liczba FF (${gs.outcomeLabel}) po dniach, w które jadłeś dany składnik, wobec średniej ze wszystkich dni.'),
             const SizedBox(height: 6),
             if (gasA.days < 5)
-              muted('Potrzeba co najmniej 5 dni z posiłkami i danymi o wiatrach. Masz: ${gasA.days}.')
+              muted('Potrzeba co najmniej 5 dni z posiłkami i danymi FF. Masz: ${gasA.days}.')
             else ...[
               Text('Średnio ${gasA.base.toStringAsFixed(1).replaceAll('.', ',')} po dniu (${gasA.days} dni).', style: const TextStyle(fontWeight: FontWeight.w600)),
               for (final r in gasA.rows)

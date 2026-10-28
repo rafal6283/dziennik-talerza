@@ -35,7 +35,7 @@ class _GasScreenState extends State<GasScreen> {
         case GasFileKind.night:
           final g = parseNightExchange(person.id, text);
           await app.setGas(g);
-          if (mounted) toast(context, 'Rytm Snu → ${person.name}: ${g.windows.length} nocy, ${g.events.length} wiatrów');
+          if (mounted) toast(context, 'Rytm Snu → ${person.name}: ${g.windows.length} nocy, FF: ${g.events.length}');
         case GasFileKind.kreskaJson:
           final g = parseKreskaExchange(person.id, text);
           await app.setGas(g);
@@ -54,7 +54,7 @@ class _GasScreenState extends State<GasScreen> {
           final total = g.days.values.fold<int>(0, (a, b) => a + b);
           if (mounted) toast(context, 'Kreska („$pick”) → ${person.name}: ${g.days.length} dni, razem $total');
         case GasFileKind.unknown:
-          if (mounted) toast(context, 'To nie jest eksport CSV z Kreski ani plik wiatrów z Rytmu Snu.');
+          if (mounted) toast(context, 'To nie jest eksport CSV z Kreski ani pliku z Rytmu Snu.');
       }
     } on FormatException catch (e) {
       if (mounted) toast(context, e.message);
@@ -70,7 +70,7 @@ class _GasScreenState extends State<GasScreen> {
     return showDialog<String>(
       context: context,
       builder: (c) => SimpleDialog(
-        title: const Text('Który licznik to wiatry?'),
+        title: const Text('Który licznik to FF?'),
         children: [
           for (final e in counters.entries)
             SimpleDialogOption(
@@ -95,9 +95,9 @@ class _GasScreenState extends State<GasScreen> {
         final p = app.active;
         final mine = app.gasSources.where((g) => g.person == p.id).toList();
         return Scaffold(
-          appBar: AppBar(title: const Text('Wiatry z innych aplikacji')),
+          appBar: AppBar(title: const Text('Kreska i Rytm Snu')),
           body: ListView(padding: const EdgeInsets.all(16), children: [
-            Text('Opcjonalnie: liczba wiatrów z Kreski i Rytmu Snu dla osoby „${p.name}”. Gdy dane są, Wzorce i analiza AI '
+            Text('Opcjonalnie: licznik FF z Kreski i Rytmu Snu dla osoby „${p.name}”. Gdy dane są, Wzorce i analiza AI '
                 'biorą je pod uwagę przy ocenie skutków posiłków (noc po dniu jedzenia i następny dzień).'),
             const SizedBox(height: 16),
             for (final g in mine)
@@ -110,7 +110,7 @@ class _GasScreenState extends State<GasScreen> {
                   subtitle: Text(g.source == gasKreska
                       ? '${g.from != null ? '${dayLabel(g.from!)} – ${dayLabel(g.to!)}' : 'brak dni'} · razem ${g.days.values.fold<int>(0, (a, b) => a + b)}'
                           '${g.events.isNotEmpty ? ' · z godzinami' : ' · tylko sumy dni (CSV)'}'
-                      : '${g.windows.length} nocy · ${g.events.length} wiatrów'),
+                      : '${g.windows.length} nocy · FF: ${g.events.length}'),
                   trailing: IconButton(
                     tooltip: 'Usuń te dane',
                     icon: const Icon(Icons.delete_outline),
@@ -136,18 +136,18 @@ class _GasScreenState extends State<GasScreen> {
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.exposure_plus_1),
               title: const Text('Kreska'),
-              subtitle: const Text('Raporty → „Eksportuj wpisy z godzinami (JSON)” i wybierz licznik z wiatrami (np. FF) – wtedy wiatry liczą się od godziny posiłku. '
+              subtitle: const Text('Raporty → „Eksportuj wpisy z godzinami (JSON)” i wybierz licznik (np. FF) – wtedy zdarzenia liczą się od godziny posiłku. '
                   'Starszy eksport CSV też działa, ale daje tylko sumy dni.'),
             ),
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.bedtime_outlined),
               title: const Text('Rytm Snu'),
-              subtitle: const Text('Ustawienia → Eksport wiatrów do Kreski. Ten sam plik wczytasz tutaj. Wiatry odrzucone przy weryfikacji nie są liczone.'),
+              subtitle: const Text('Ustawienia → Więcej → Eksport FF do Kreski. Ten sam plik wczytasz tutaj. Zdarzenia odrzucone przy weryfikacji nie są liczone.'),
             ),
             const SizedBox(height: 8),
             Text('Pliki zawierają całą historię, więc ponowne wczytanie zastępuje poprzednie dane z danej aplikacji. '
-                'Kreska JSON i Rytm Snu podają godziny wiatrów, Kreska CSV – tylko sumy dni.',
+                'Kreska JSON i Rytm Snu podają godziny zdarzeń, Kreska CSV – tylko sumy dni.',
                 style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12.5)),
           ]),
         );

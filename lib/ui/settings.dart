@@ -259,11 +259,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         const SectionTitle('Inne aplikacje'),
         ListTile(
-          leading: const Icon(Icons.air),
-          title: const Text('Wiatry z Kreski i Rytmu Snu'),
+          leading: const Icon(Icons.link),
+          title: const Text('Kreska i Rytm Snu'),
           subtitle: Text(() {
             final n = app.gasSources.where((g) => g.person == app.active.id).map((g) => g.sourceLabel).toList();
-            return n.isEmpty ? 'Opcjonalnie – nic nie zaimportowano' : 'Dla „${app.active.name}”: ${n.join(', ')}';
+            return n.isEmpty ? 'Opcjonalnie' : 'Dla „${app.active.name}”: ${n.join(', ')}';
           }()),
           trailing: const Icon(Icons.chevron_right),
           onTap: () async {

@@ -69,8 +69,8 @@ class DziennikExchange extends ExchangeAdapter {
 
   @override
   List<(String, String)> get sources => const [
-        ('rytm-snu', 'Rytm Snu (wiatry w nocy)'),
-        ('kreska', 'Kreska (licznik wiatrów w ciągu dnia)'),
+        ('rytm-snu', 'Rytm Snu (FF w nocy)'),
+        ('kreska', 'Kreska (licznik FF w ciągu dnia)'),
       ];
 
   /// Osoba w Dzienniku, do której trafiają pobrane dane (domyślnie pierwsza — zwykle „Ja”).
