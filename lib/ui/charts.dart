@@ -572,7 +572,7 @@ class _GutPainter extends CustomPainter {
 // WIATRY — 14 DNI
 // =========================================================================
 
-/// Słupki wiatrów: dzień (Kreska) + noc po nim (Nocny Licznik). Kaskada i dymek z rozbiciem.
+/// Słupki wiatrów: dzień (Kreska) + noc po nim (Rytm Snu). Kaskada i dymek z rozbiciem.
 class GasBars extends StatelessWidget {
   final List<String> days;
   final List<int?> day;

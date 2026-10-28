@@ -271,7 +271,7 @@ class AppState extends ChangeNotifier {
     await _commit();
   }
 
-  // ---------- wiatry z Kreski i Nocnego Licznika ----------
+  // ---------- wiatry z Kreski i Rytmu Snu ----------
 
   Future<void> setGas(GasSource g) async {
     gasSources.removeWhere((x) => x.id == g.id);

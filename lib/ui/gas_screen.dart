@@ -8,7 +8,7 @@ import '../gas.dart';
 import '../main.dart';
 import 'format.dart';
 
-/// Opcjonalny import wiatrów z Kreski (CSV) i Nocnego Licznika (JSON) dla wybranej osoby.
+/// Opcjonalny import wiatrów z Kreski (CSV) i Rytmu Snu (JSON) dla wybranej osoby.
 class GasScreen extends StatefulWidget {
   const GasScreen({super.key});
   @override
@@ -35,7 +35,7 @@ class _GasScreenState extends State<GasScreen> {
         case GasFileKind.night:
           final g = parseNightExchange(person.id, text);
           await app.setGas(g);
-          if (mounted) toast(context, 'Nocny Licznik → ${person.name}: ${g.windows.length} nocy, ${g.events.length} wiatrów');
+          if (mounted) toast(context, 'Rytm Snu → ${person.name}: ${g.windows.length} nocy, ${g.events.length} wiatrów');
         case GasFileKind.kreskaJson:
           final g = parseKreskaExchange(person.id, text);
           await app.setGas(g);
@@ -54,7 +54,7 @@ class _GasScreenState extends State<GasScreen> {
           final total = g.days.values.fold<int>(0, (a, b) => a + b);
           if (mounted) toast(context, 'Kreska („$pick”) → ${person.name}: ${g.days.length} dni, razem $total');
         case GasFileKind.unknown:
-          if (mounted) toast(context, 'To nie jest eksport CSV z Kreski ani plik wiatrów z Nocnego Licznika.');
+          if (mounted) toast(context, 'To nie jest eksport CSV z Kreski ani plik wiatrów z Rytmu Snu.');
       }
     } on FormatException catch (e) {
       if (mounted) toast(context, e.message);
@@ -97,7 +97,7 @@ class _GasScreenState extends State<GasScreen> {
         return Scaffold(
           appBar: AppBar(title: const Text('Wiatry z innych aplikacji')),
           body: ListView(padding: const EdgeInsets.all(16), children: [
-            Text('Opcjonalnie: liczba wiatrów z Kreski i Nocnego Licznika dla osoby „${p.name}”. Gdy dane są, Wzorce i analiza AI '
+            Text('Opcjonalnie: liczba wiatrów z Kreski i Rytmu Snu dla osoby „${p.name}”. Gdy dane są, Wzorce i analiza AI '
                 'biorą je pod uwagę przy ocenie skutków posiłków (noc po dniu jedzenia i następny dzień).'),
             const SizedBox(height: 16),
             for (final g in mine)
@@ -106,7 +106,7 @@ class _GasScreenState extends State<GasScreen> {
                 color: cs.surfaceContainer,
                 child: ListTile(
                   leading: Icon(g.source == gasKreska ? Icons.exposure_plus_1 : Icons.bedtime_outlined),
-                  title: Text(g.source == gasKreska ? 'Kreska · licznik „${g.label}”' : 'Nocny Licznik'),
+                  title: Text(g.source == gasKreska ? 'Kreska · licznik „${g.label}”' : 'Rytm Snu'),
                   subtitle: Text(g.source == gasKreska
                       ? '${g.from != null ? '${dayLabel(g.from!)} – ${dayLabel(g.to!)}' : 'brak dni'} · razem ${g.days.values.fold<int>(0, (a, b) => a + b)}'
                           '${g.events.isNotEmpty ? ' · z godzinami' : ' · tylko sumy dni (CSV)'}'
@@ -128,7 +128,7 @@ class _GasScreenState extends State<GasScreen> {
               onPressed: busy ? null : _import,
               style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
               icon: busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.file_open_outlined),
-              label: const Text('Wczytaj plik z Kreski lub Nocnego Licznika'),
+              label: const Text('Wczytaj plik z Kreski lub Rytmu Snu'),
             ),
             const SizedBox(height: 24),
             const SectionTitle('Jak wyeksportować'),
@@ -142,12 +142,12 @@ class _GasScreenState extends State<GasScreen> {
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.bedtime_outlined),
-              title: const Text('Nocny Licznik'),
+              title: const Text('Rytm Snu'),
               subtitle: const Text('Ustawienia → Eksport wiatrów do Kreski. Ten sam plik wczytasz tutaj. Wiatry odrzucone przy weryfikacji nie są liczone.'),
             ),
             const SizedBox(height: 8),
             Text('Pliki zawierają całą historię, więc ponowne wczytanie zastępuje poprzednie dane z danej aplikacji. '
-                'Kreska JSON i Nocny Licznik podają godziny wiatrów, Kreska CSV – tylko sumy dni.',
+                'Kreska JSON i Rytm Snu podają godziny wiatrów, Kreska CSV – tylko sumy dni.',
                 style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12.5)),
           ]),
         );

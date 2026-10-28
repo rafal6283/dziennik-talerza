@@ -1,6 +1,6 @@
 // Wiatry z innych aplikacji użytkownika:
 // - Kreska: eksport JSON „wymiana-zdarzen” (każde kliknięcie z godziną) albo starszy CSV (typ;nazwa;data;wartość;…) – tylko sumy dni,
-// - Nocny Licznik: plik „wymiana-zdarzen” v1 (JSON) – noce z nagraniem i godziny wykrytych wiatrów.
+// - Rytm Snu (dawniej Nocny Licznik): plik „wymiana-zdarzen” v1 (JSON) – noce z nagraniem i godziny wykrytych wiatrów.
 // Każdy plik zawiera całą historię źródła, więc ponowny import zastępuje poprzedni.
 
 import 'dart:convert';
@@ -9,7 +9,10 @@ import 'calc.dart';
 import 'models.dart';
 
 const gasKreska = 'kreska';
+/// Rytm Snu — zapisywany pod dawnym identyfikatorem; pliki mają teraz źródło "rytm-snu".
 const gasNight = 'nocny-licznik';
+const gasNightNew = 'rytm-snu';
+bool isNightSource(Object? s) => s == gasNight || s == gasNightNew;
 
 class GasSource {
   final String person;
@@ -18,8 +21,8 @@ class GasSource {
   final int importedAt;
   final Map<String, int> days; // Kreska: data → liczba
   final String? from, to; // zakres dni pokrytych przez plik Kreski
-  final List<(int, int)> windows; // Nocny Licznik: noce (ms)
-  final List<int> events; // wiatry z godziną (ms): Nocny Licznik bez odrzuconych, Kreska z eksportu JSON
+  final List<(int, int)> windows; // Rytm Snu: noce (ms)
+  final List<int> events; // wiatry z godziną (ms): Rytm Snu bez odrzuconych, Kreska z eksportu JSON
 
   GasSource({
     required this.person,
@@ -37,7 +40,7 @@ class GasSource {
         events = events ?? [];
 
   String get id => '$person:$source';
-  String get sourceLabel => source == gasKreska ? 'Kreska' : 'Nocny Licznik';
+  String get sourceLabel => source == gasKreska ? 'Kreska' : 'Rytm Snu';
 
   factory GasSource.fromJson(Map<String, dynamic> j) => GasSource(
         person: '${j['person'] ?? 'me'}',
@@ -81,7 +84,7 @@ GasFileKind detectGasFile(String text) {
   if (t.startsWith('{')) {
     try {
       final j = jsonDecode(t);
-      if (j is Map && j['format'] == 'wymiana-zdarzen' && j['source'] == gasNight) return GasFileKind.night;
+      if (j is Map && j['format'] == 'wymiana-zdarzen' && isNightSource(j['source'])) return GasFileKind.night;
       if (j is Map && j['format'] == 'wymiana-zdarzen' && j['source'] == gasKreska) return GasFileKind.kreskaJson;
     } catch (_) {}
   }
@@ -189,13 +192,13 @@ GasSource parseKreskaExchange(String person, String text) {
   );
 }
 
-/// Nocny Licznik → noce i wiatry (bez odrzuconych przez użytkownika).
+/// Rytm Snu → noce i wiatry (bez odrzuconych przez użytkownika).
 GasSource parseNightExchange(String person, String text) {
   final j = jsonDecode(text.replaceFirst('﻿', ''));
-  if (j is! Map || j['format'] != 'wymiana-zdarzen' || j['source'] != gasNight) {
-    throw const FormatException('To nie jest plik eksportu z Nocnego Licznika');
+  if (j is! Map || j['format'] != 'wymiana-zdarzen' || !isNightSource(j['source'])) {
+    throw const FormatException('To nie jest plik eksportu z Rytmu Snu');
   }
-  if (j['version'] != 1) throw const FormatException('Nieobsługiwana wersja pliku z Nocnego Licznika');
+  if (j['version'] != 1) throw const FormatException('Nieobsługiwana wersja pliku z Rytmu Snu');
   final windows = <(int, int)>[
     for (final w in (j['windows'] is List ? j['windows'] as List : const []))
       if (w is Map && w['start'] is num && w['end'] is num) ((w['start'] as num).toInt(), (w['end'] as num).toInt())
@@ -250,7 +253,7 @@ class GasSeries {
     return k.days[date] ?? 0;
   }
 
-  /// Wiatry w nocy po danym dniu z Nocnego Licznika, null gdy tej nocy nie nagrywano.
+  /// Wiatry w nocy po danym dniu z Rytmu Snu, null gdy tej nocy nie nagrywano.
   int? nightAfter(String date) => _nights[date];
 
   /// Kreska z godzinami (eksport JSON).
@@ -328,7 +331,7 @@ String gasLines(GasSeries s, String since, String until) {
   for (var d = since; d.compareTo(until) <= 0; d = shiftDay(d, 1)) {
     final day = s.day(d), n = s.nightAfter(d);
     if (day == null && n == null) continue;
-    out.add('$d: ${[if (day != null) 'w ciągu dnia $day (Kreska)', if (n != null) 'w nocy po tym dniu $n (Nocny Licznik)'].join(', ')}');
+    out.add('$d: ${[if (day != null) 'w ciągu dnia $day (Kreska)', if (n != null) 'w nocy po tym dniu $n (Rytm Snu)'].join(', ')}');
   }
   return out.join('\n');
 }

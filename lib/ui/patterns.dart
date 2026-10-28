@@ -148,7 +148,7 @@ class _PatternsTabState extends State<PatternsTab> {
             title('Wiatry'),
             muted([
               if (gs.kreska != null) 'Kreska: licznik „${gs.kreska!.label}” (w ciągu dnia)',
-              if (gs.night != null) 'Nocny Licznik (w nocy)',
+              if (gs.night != null) 'Rytm Snu (w nocy)',
             ].join(' · ')),
             const SizedBox(height: 10),
             Builder(builder: (context) {
