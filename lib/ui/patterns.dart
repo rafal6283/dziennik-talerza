@@ -4,6 +4,7 @@ import '../ai.dart';
 import '../calc.dart';
 import '../gas.dart';
 import '../main.dart';
+import 'imported.dart';
 import 'charts.dart';
 import 'format.dart';
 
@@ -145,7 +146,10 @@ class _PatternsTabState extends State<PatternsTab> {
       if (gs.any)
         Panel(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            title('FF'),
+            Row(children: [
+              Expanded(child: title('FF')),
+              ImportedTag(importedFromGas(kreska: gs.kreska != null, night: gs.night != null)),
+            ]),
             muted([
               if (gs.kreska != null) 'Kreska: licznik „${gs.kreska!.label}” (w ciągu dnia)',
               if (gs.night != null) 'Rytm Snu (w nocy)',

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../calc.dart';
 import '../main.dart';
 import '../models.dart';
+import 'imported.dart';
 import 'charts.dart';
 import 'format.dart';
 import 'gut_form.dart';
@@ -296,6 +297,8 @@ class _GutCard extends StatelessWidget {
               Icon(Icons.timeline, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
               const SizedBox(width: 8),
               Expanded(child: Text('FF · ${parts.join(' · ')}', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13))),
+              const SizedBox(width: 6),
+              ImportedTag(importedFromGas(kreska: dd != null, night: nb != null || na != null)),
             ]),
           );
         }),
