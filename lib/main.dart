@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:koofr_backup_ui/koofr_backup_ui.dart' show KoofrBackup;
+import 'package:koofr_backup_ui/koofr_backup_ui.dart' show KoofrBackground, KoofrBackup;
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'koofr_backup.dart';
@@ -25,6 +25,13 @@ Future<T> withExternal<T>(Future<T> Function() f) async {
     Future.delayed(const Duration(seconds: 2), () => externalActivity--);
   }
 }
+
+/// Kopia na Koofr w tle (Android) — także przy zamkniętej aplikacji.
+@pragma('vm:entry-point')
+void koofrCallback() => KoofrBackground.dispatch(() async {
+      await app.load();
+      return DziennikBackup();
+    });
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -94,7 +101,7 @@ class _LockGateState extends State<LockGate> with WidgetsBindingObserver {
   Future<void> _load() async {
     final results = await Future.wait([Lock.load(), app.load()]);
     // kopia na Koofr w tle (po wczytaniu danych)
-    KoofrBackup.setup(DziennikBackup()).ignore();
+    KoofrBackup.setup(DziennikBackup()).then((_) => KoofrBackground.start(koofrCallback)).ignore();
     final c = results.first as LockConfig;
     if (!mounted) return;
     setState(() {
