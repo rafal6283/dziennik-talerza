@@ -249,3 +249,59 @@ ElimResult elimResult(Elimination e, GasSeries s, List<Meal> meals, List<GutEntr
     gutMean(half, e.elimEnd),
   );
 }
+
+// ---------- czynniki dnia dla Polar EKG ----------
+
+const _alcoholKeys = ['piwo', 'piwa', 'wino', 'wina', 'wodk', 'whisk', 'drink', 'nalewk', 'prosecco', 'szampan', 'cydr', 'likier', 'rum ', 'gin ', 'koniak', 'brandy', 'aperol', 'martini', 'grzaniec'];
+const _coffeeKeys = ['kawa', 'kawy', 'kawe', 'espresso', 'latte', 'cappuccino', 'americano', 'flat white', 'macchiato'];
+
+bool _hasKey(String text, List<String> keys) {
+  final t = _fold(text);
+  return keys.any((k) => t.contains(' $k'));
+}
+
+bool mealHasAlcohol(Meal m) {
+  final t = '${m.name} ${m.items.map((i) => i.name).join(' ')}';
+  if (_fold(t).contains(' bezalkohol') || _fold(t).contains(' 0 0')) return false;
+  return _hasKey(t, _alcoholKeys);
+}
+
+bool mealHasCoffee(Meal m) {
+  final t = '${m.name} ${m.items.map((i) => i.name).join(' ')}';
+  if (_fold(t).contains(' bezkofein') || _fold(t).contains(' bez kofeiny')) return false;
+  return _hasKey(t, _coffeeKeys);
+}
+
+/// „czynniki-dnia” v1 z posiłków jednej osoby: alkohol, kawa, kolacja, kalorie.
+Map<String, Object?> mealFactors(List<Meal> meals, String person) {
+  final by = <String, List<Meal>>{};
+  for (final m in meals) {
+    if (m.person == person && m.date.length == 10) by.putIfAbsent(m.date, () => []).add(m);
+  }
+  final days = <Map<String, Object?>>[];
+  for (final d in (by.keys.toList()..sort())) {
+    final l = by[d]!;
+    double hour(Meal m) {
+      final p = m.time.split(':');
+      return p.length == 2 ? (int.tryParse(p[0]) ?? 0) + (int.tryParse(p[1]) ?? 0) / 60 : 12;
+    }
+
+    final kcal = l.fold<double>(0, (s, m) => s + m.total.kcal);
+    days.add({
+      'date': d,
+      'meals': l.length,
+      'kcal': kcal.round(),
+      'big_meal_kcal': l.map((m) => m.total.kcal).fold<double>(0, (a, b) => a > b ? a : b).round(),
+      'last_meal_h': double.parse(l.map(hour).reduce((a, b) => a > b ? a : b).toStringAsFixed(2)),
+      'alcohol': l.where(mealHasAlcohol).length,
+      'coffee': l.where(mealHasCoffee).length,
+    });
+  }
+  return {
+    'format': 'czynniki-dnia',
+    'version': 1,
+    'source': 'dziennik-talerza',
+    'exported_at': DateTime.now().millisecondsSinceEpoch,
+    'days': days,
+  };
+}

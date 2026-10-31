@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:koofr_backup_ui/koofr_backup_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'fodmap.dart';
 import 'gas.dart';
 import 'main.dart' show app;
 
@@ -66,6 +67,13 @@ class DziennikExchange extends ExchangeAdapter {
 
   static const _kPerson = 'ex_person';
   static const _kCounter = 'ex_kreska_counter';
+
+  @override
+  String? get publishes => 'Posiłki dnia (alkohol, kawa, pora kolacji, kalorie) – dla Polar EKG, który szuka, co poprzedza napady AF';
+
+  @override
+  Future<Map<String, List<int>?>> export() async =>
+      {'czynniki-posilki': utf8.encode(jsonEncode(mealFactors(app.allMeals, await person())))};
 
   @override
   List<(String, String)> get sources => const [
