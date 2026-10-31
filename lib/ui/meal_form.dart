@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../ai.dart';
 import '../calc.dart';
+import '../fodmap.dart';
 import '../food_db.dart';
 import '../food_pack.dart';
 import '../food_table.dart';
@@ -384,7 +385,13 @@ class _MealFormState extends State<MealForm> {
     await app.saveMeal(m);
     if (!mounted) return;
     Navigator.pop(context);
-    toast(context, old == null ? 'Zapisano. Za jakiś czas dodaj, jak się czujesz.' : 'Zapisano zmiany');
+    final el = app.activeElimination;
+    final hit = el == null ? const <String>{} : groupsOfMeal(m).intersection(el.forbiddenOn(m.date));
+    if (hit.isNotEmpty) {
+      toast(context, 'Zapisano. Uwaga – dieta eliminacyjna: ten posiłek zawiera ${hit.map((g) => groupById(g)?.name.split(' (').first ?? g).join(', ')}.');
+    } else {
+      toast(context, old == null ? 'Zapisano. Za jakiś czas dodaj, jak się czujesz.' : 'Zapisano zmiany');
+    }
   }
 
   @override

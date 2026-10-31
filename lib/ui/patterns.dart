@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../ai.dart';
 import '../calc.dart';
+import '../fodmap.dart';
 import '../gas.dart';
 import '../main.dart';
 import 'imported.dart';
 import 'charts.dart';
+import 'elimination_screen.dart';
 import 'format.dart';
 
 class PatternsTab extends StatefulWidget {
@@ -66,6 +68,7 @@ class _PatternsTabState extends State<PatternsTab> {
     final en = energyByType(meals);
     final gs = app.gasSeries;
     final gasA = gasAssociations(meals, gs);
+    final gasG = gasGroupAssociations(meals, gs);
 
     return ListView(padding: const EdgeInsets.only(top: 6, bottom: 32), children: [
       Panel(
@@ -123,6 +126,15 @@ class _PatternsTabState extends State<PatternsTab> {
             for (final r in ga.rows) assocRow(r.ingredient, r.rate, '${(r.rate * 100).round()}% (${r.hits}/${r.total})', Palette.bad(context), flag: ga.flagged(r)),
             if (ga.rows.any(ga.flagged)) Padding(padding: const EdgeInsets.only(top: 6), child: muted('⚑ wyraźnie częściej niż przeciętnie, przy co najmniej 3 wystąpieniach.')),
           ],
+          if (!gs.any)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EliminationScreen())),
+                icon: const Icon(Icons.no_food_outlined),
+                label: Text(app.activeElimination != null ? 'Dieta eliminacyjna – postęp' : 'Sprawdź dietą eliminacyjną'),
+              ),
+            ),
         ]),
       ),
       Panel(
@@ -185,6 +197,27 @@ class _PatternsTabState extends State<PatternsTab> {
                     flag: gasA.flagged(r)),
               if (gasA.rows.any(gasA.flagged)) Padding(padding: const EdgeInsets.only(top: 6), child: muted('⚑ co najmniej 30% więcej niż średnio, przy co najmniej 3 dniach.')),
             ],
+            if (gasG.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              const Text('Grupy produktów', style: TextStyle(fontWeight: FontWeight.w600)),
+              muted('FF po dniach z daną grupą (FODMAP, kapustne, gazowane) wobec dni bez niej.'),
+              const SizedBox(height: 6),
+              for (final r in gasG)
+                assocRow(r.group.name.split(' (').first, (r.ratio / 2).clamp(0, 1).toDouble(),
+                    '${r.avgWith.toStringAsFixed(1).replaceAll('.', ',')} / ${r.avgWithout.toStringAsFixed(1).replaceAll('.', ',')}',
+                    r.flagged ? Palette.bad(context) : Palette.amber(context),
+                    flag: r.flagged),
+              muted('z grupą / bez niej · ⚑ co najmniej 30% i 1 FF więcej, przy 3+ dniach każdego rodzaju.'),
+            ],
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EliminationScreen())),
+                icon: const Icon(Icons.no_food_outlined),
+                label: Text(app.activeElimination != null ? 'Dieta eliminacyjna – postęp' : 'Sprawdź dietą eliminacyjną'),
+              ),
+            ),
           ]),
         ),
       Panel(

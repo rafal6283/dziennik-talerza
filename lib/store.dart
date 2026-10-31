@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'calc.dart';
+import 'fodmap.dart';
 import 'gas.dart';
 import 'models.dart';
 
@@ -27,6 +28,7 @@ class AppState extends ChangeNotifier {
   List<Meal> allMeals = [];
   List<GutEntry> allGut = [];
   List<GasSource> gasSources = [];
+  List<Elimination> eliminations = [];
   bool loaded = false;
 
   Directory? _dir;
@@ -90,6 +92,7 @@ class AppState extends ChangeNotifier {
         'meals': allMeals.map((m) => m.toJson()).toList(),
         'gut': allGut.map((g) => g.toJson()).toList(),
         if (gasSources.isNotEmpty) 'gasSources': gasSources.map((g) => g.toJson()).toList(),
+        if (eliminations.isNotEmpty) 'eliminations': eliminations.map((e) => e.toJson()).toList(),
       };
 
   Future<void> _save() async {
@@ -119,6 +122,12 @@ class AppState extends ChangeNotifier {
     for (final g in ngas) {
       gasSources.removeWhere((x) => x.id == g.id);
       gasSources.add(g);
+    }
+    final nel = [for (final e in (j['eliminations'] is List ? j['eliminations'] as List : const [])) if (e is Map) Elimination.fromJson(Map<String, dynamic>.from(e))];
+    if (replace && j.containsKey('eliminations')) eliminations = [];
+    for (final e in nel) {
+      eliminations.removeWhere((x) => x.id == e.id);
+      eliminations.add(e);
     }
     var added = 0, updated = 0;
     if (replace) {
@@ -272,6 +281,32 @@ class AppState extends ChangeNotifier {
   }
 
   // ---------- wiatry z Kreski i Rytmu Snu ----------
+
+  // ---------- dieta eliminacyjna ----------
+
+  /// Bieżąca (albo ostatnia) dieta eliminacyjna aktywnej osoby.
+  Elimination? get elimination {
+    final mine = eliminations.where((e) => e.person == active.id).toList()..sort((a, b) => b.start.compareTo(a.start));
+    return mine.firstOrNull;
+  }
+
+  /// Dieta trwa dziś (od startu do końca ostatniej przerwy).
+  Elimination? get activeElimination {
+    final e = elimination;
+    final t = todayIso();
+    return e != null && !e.stopped && e.end.compareTo(t) >= 0 ? e : null;
+  }
+
+  Future<void> saveElimination(Elimination e) async {
+    eliminations.removeWhere((x) => x.id == e.id);
+    eliminations.add(e);
+    await _commit();
+  }
+
+  Future<void> deleteElimination(String id) async {
+    eliminations.removeWhere((x) => x.id == id);
+    await _commit();
+  }
 
   Future<void> setGas(GasSource g) async {
     gasSources.removeWhere((x) => x.id == g.id);

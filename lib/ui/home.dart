@@ -7,6 +7,7 @@ import '../main.dart';
 import '../models.dart';
 import 'imported.dart';
 import 'charts.dart';
+import 'elimination_screen.dart';
 import 'format.dart';
 import 'gut_form.dart';
 import 'meal_form.dart';
@@ -154,6 +155,20 @@ class JournalTab extends StatelessWidget {
               title: const Text('Uzupełnij profil'),
               subtitle: const Text('Płeć, wiek, wzrost i waga ustawią cel kalorii i białka dla tej osoby.'),
               onTap: onProfile,
+            ),
+          ),
+        ),
+      if (app.activeElimination case final e?)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+          child: Material(
+            color: Theme.of(context).colorScheme.tertiaryContainer,
+            borderRadius: BorderRadius.circular(12),
+            child: ListTile(
+              leading: const Icon(Icons.no_food_outlined),
+              title: const Text('Dieta eliminacyjna'),
+              subtitle: Text(phaseText(e, day)),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EliminationScreen())),
             ),
           ),
         ),
