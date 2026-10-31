@@ -28,6 +28,7 @@ void main() {
     expect(e.phaseOn('2026-11-21').group, 'fruktany');
     expect(e.phaseOn('2026-11-19').stage, ElimStage.wash);
     final j = Elimination.fromJson(e.toJson());
-    expect((j.groups, j.start, j.elimDays), (['laktoza', 'fruktany'], '2026-11-01', 14));
+    expect(j.groups, ['laktoza', 'fruktany']);
+    expect((j.start, j.elimDays), ('2026-11-01', 14));
   });
 }
