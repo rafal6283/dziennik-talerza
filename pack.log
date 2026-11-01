@@ -1,0 +1,14 @@
+brands VARCHAR
+countries_tags VARCHAR[]
+lang VARCHAR
+nutriments STRUCT("name" VARCHAR, "value" FLOAT, "100g" FLOAT, serving FLOAT, unit VARCHAR, prepared_value FLOAT, prepared_100g FLOAT, prepared_serving FLOAT, prepared_unit VARCHAR)[]
+product_name STRUCT(lang VARCHAR, "text" VARCHAR)[]
+serving_quantity VARCHAR
+unique_scans_n INTEGER
+Traceback (most recent call last):
+  File "/home/runner/work/dziennik-talerza/dziennik-talerza/tool/off_pack.py", line 43, in <module>
+    rows = con.sql(sql).fetchall()
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/.local/lib/python3.12/site-packages/duckdb/_relation.py", line 3017, in guarded
+    raise _trimmed(error) from error.__cause__
+_duckdb.HTTPException: HTTP Error: HTTP GET error on 'https://huggingface.co/datasets/openfoodfacts/product-database/resolve/main/food.parquet' (HTTP 429 Too Many Requests)
