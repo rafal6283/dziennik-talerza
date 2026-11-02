@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:rodzina_wykresy/rodzina_wykresy.dart' show staggered, DonutChart, DonutSlice, CalendarHeatmap;
 
 import '../ai.dart';
 import '../calc.dart';
 import '../fodmap.dart';
 import '../gas.dart';
 import '../main.dart';
+import '../models.dart';
 import 'imported.dart';
 import 'charts.dart';
 import 'elimination_screen.dart';
@@ -70,7 +72,17 @@ class _PatternsTabState extends State<PatternsTab> {
     final gasA = gasAssociations(meals, gs);
     final gasG = gasGroupAssociations(meals, gs);
 
-    return ListView(padding: const EdgeInsets.only(top: 6, bottom: 32), children: [
+    // makroskładniki: średnio na dzień z ostatnich 7 dni z posiłkami
+    final week = [for (var i = 0; i < 7; i++) shiftDay(today, -i)];
+    final mdays = week.where((d) => meals.any((m) => m.date == d)).toList();
+    final mt = meals.where((m) => mdays.contains(m.date)).fold(Macros.zero, (a, m) => a + m.total);
+    final nd = mdays.isEmpty ? 1 : mdays.length;
+    final comfort = <DateTime, double>{
+      for (final g in gut)
+        if (gutDayScore(gut.where((x) => x.date == g.date)) case final sc?) DateTime.parse('${g.date}T00:00:00'): sc.toDouble()
+    };
+
+    return ListView(padding: const EdgeInsets.only(top: 6, bottom: 32), children: staggered([
       Panel(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           title('Kalorie dzień po dniu'),
@@ -79,6 +91,40 @@ class _PatternsTabState extends State<PatternsTab> {
           muted('Zielona linia to cel tej osoby: $goal kcal. Dotknij słupka albo przesuń palcem, żeby zobaczyć dzień.'),
         ]),
       ),
+      if (mt.kcal > 0)
+        Panel(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            title('Makroskładniki · średnio z $nd ${nd == 1 ? 'dnia' : 'dni'}'),
+            Center(
+              child: DonutChart(
+                size: 170,
+                centerLabel: 'kcal / dzień',
+                format: (v) => '${v.round()} kcal',
+                slices: [
+                  DonutSlice('Białko ${(mt.p / nd).round()} g', mt.p * 4 / nd, const Color(0xFF3F8FD2)),
+                  DonutSlice('Węglowodany ${(mt.c / nd).round()} g', mt.c * 4 / nd, Palette.amber(context)),
+                  DonutSlice('Tłuszcz ${(mt.f / nd).round()} g', mt.f * 9 / nd, const Color(0xFFB0559A)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+            muted('Udział kalorii z białka, węglowodanów i tłuszczu. Dotknij wycinka, by zobaczyć szczegóły.'),
+          ]),
+        ),
+      if (comfort.length >= 3)
+        Panel(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            title('Komfort trawienia · kalendarz'),
+            CalendarHeatmap(
+              values: {for (final e in comfort.entries) e.key: 6 - e.value}, // ciemniej = gorzej
+              color: Palette.bad(context),
+              weeks: 16,
+              format: (v) => comfortNames[(6 - v).round().clamp(1, 5)],
+            ),
+            const SizedBox(height: 6),
+            muted('Im ciemniejszy dzień, tym gorsze trawienie. Dotknij dnia, by zobaczyć ocenę.'),
+          ]),
+        ),
       Panel(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           title('Trawienie · ostatnie 14 dni'),
@@ -257,7 +303,7 @@ class _PatternsTabState extends State<PatternsTab> {
             ),
         ]),
       ),
-    ]);
+    ]));
   }
 }
 
