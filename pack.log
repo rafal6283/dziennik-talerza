@@ -1,0 +1,13 @@
+brands VARCHAR
+countries_tags VARCHAR[]
+lang VARCHAR
+nutriments STRUCT("name" VARCHAR, "value" FLOAT, "100g" FLOAT, serving FLOAT, unit VARCHAR, prepared_value FLOAT, prepared_100g FLOAT, prepared_serving FLOAT, prepared_unit VARCHAR)[]
+product_name STRUCT(lang VARCHAR, "text" VARCHAR)[]
+serving_quantity VARCHAR
+unique_scans_n INTEGER
+Traceback (most recent call last):
+  File "/home/runner/work/dziennik-talerza/dziennik-talerza/tool/off_pack.py", line 46, in <module>
+    rows = con.sql(sql).fetchall()
+  File "/home/runner/.local/lib/python3.14/site-packages/duckdb/_relation.py", line 3017, in guarded
+    raise _trimmed(error) from error.__cause__
+_duckdb.SerializationException: Serialization Error: Failed to parse JSON string: {"exception_type":"HTTP","exception_message":"HTTP GET error on 'https://huggingface.co/datasets/openfoodfacts/product-database/resolve/main/food.parquet' (HTTP 429 Too Many Requests)","header_ETag":"W/\"bc-gWkb+4A4iOQdIqNEj1uypNWZ3+o\"","header_Connection":"keep-alive","header_Access-Control-Allow-Origin":"https://huggingface.co","header_Via":"1.1 a1f8044693d3f7f5c5e4c6cb7ec5cb9c.cloudfront.net (CloudFront)","header_Access-Control-Max-Age":"86400","header_Access-Control-Expose-Headers":"X-Repo-Commit,X-HF-Warning,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Linked-Size,X-Linked-ETag,X-Xet-Hash,RateLimit,RateLimit-Policy","header_X-Error-Message":"We had to rate limit your IP (4.242.63.35). To continue using our service, create a HF account or login to your existing account, and make sure you pass a HF_TOKEN if you're using the API.","header_X-Amz-Cf-Pop":"HIO52-P5","header_Date":"Sat, 14 Nov 2026 19:50:31 GMT","header_Alt-Svc":"h3=\":443\"; ma=86400","header_X-Cache":"Error from cloudfront","reason":"Too Many Requests","header_X-Amz-Cf-Id":"I-JCS4EE42m5Np1d0jqSnHE3g446pzraxki8Fa2xVw6r6qK0j1SffA==","header_Referrer-Policy":"strict-origin-when-cross-origin","header_X-Request-Id":"Root=1-6af8bb87-5884cafe509c8c4a4076976d","header_Vary":"Origin","header_Content-Length":"188","header_Content-Type":"text/plain; charset=utf-8","response_body":"We had to rate limit your IP (4.242.63.35). To continue using our service, create a HF account or login to your existing account, and make sure you pass a HF_TOKEN if you're using the API.","header_X-Powered-By":"huggingface-moon","header_cross-origin-opener-policy":"same-origin","header_Strict-Transport-Security":"max-age=31536000","status_code":"429","header_RateLimit-Policy":"\"fixed window\";\"resolvers\";q=3000;w=300","header_Retry-After":"45","header_RateLimit":"\"resolvers\";r=0;t=45"} (retry quota for 'https://huggingface.co' exhausted: requests to this host keep failing)
