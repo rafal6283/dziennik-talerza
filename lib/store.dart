@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'calc.dart';
+import 'extras.dart';
 import 'fodmap.dart';
 import 'gas.dart';
 import 'models.dart';
@@ -22,6 +23,10 @@ class AppState extends ChangeNotifier {
   /// Wywoływane po zapisie / usunięciu posiłku (np. synchronizacja z Health Connect).
   Future<void> Function(Meal m)? onMealSaved;
   Future<void> Function(String id)? onMealDeleted;
+  Future<void> Function(String mealId)? onReaction;
+
+  /// Odświeżenie widoków po zmianie danych spoza magazynu (np. aktywność z Health Connect).
+  void refresh() => notifyListeners();
 
   List<Person> people = [Person(id: 'me', name: 'Ja')];
   String activeId = 'me';
@@ -29,6 +34,15 @@ class AppState extends ChangeNotifier {
   List<GutEntry> allGut = [];
   List<GasSource> gasSources = [];
   List<Elimination> eliminations = [];
+  List<Favorite> favorites = [];
+  List<Recipe> recipes = [];
+  List<Drink> allDrinks = [];
+  List<WeightEntry> allWeights = [];
+  List<MedEntry> allMeds = [];
+  List<PantryItem> pantry = [];
+
+  /// Wywoływane po każdej zmianie danych (widżet, przypomnienia).
+  final List<void Function()> afterCommit = [];
   bool loaded = false;
 
   Directory? _dir;
@@ -93,6 +107,12 @@ class AppState extends ChangeNotifier {
         'gut': allGut.map((g) => g.toJson()).toList(),
         if (gasSources.isNotEmpty) 'gasSources': gasSources.map((g) => g.toJson()).toList(),
         if (eliminations.isNotEmpty) 'eliminations': eliminations.map((e) => e.toJson()).toList(),
+        if (favorites.isNotEmpty) 'favorites': favorites.map((e) => e.toJson()).toList(),
+        if (recipes.isNotEmpty) 'recipes': recipes.map((e) => e.toJson()).toList(),
+        if (allDrinks.isNotEmpty) 'drinks': allDrinks.map((e) => e.toJson()).toList(),
+        if (allWeights.isNotEmpty) 'weights': allWeights.map((e) => e.toJson()).toList(),
+        if (allMeds.isNotEmpty) 'meds': allMeds.map((e) => e.toJson()).toList(),
+        if (pantry.isNotEmpty) 'pantry': pantry.map((e) => e.toJson()).toList(),
       };
 
   Future<void> _save() async {
@@ -105,7 +125,15 @@ class AppState extends ChangeNotifier {
   Future<void> _commit() async {
     notifyListeners();
     await _save();
+    for (final f in afterCommit) {
+      try {
+        f();
+      } catch (_) {}
+    }
   }
+
+  /// Tylko do testów: wczytanie danych z mapy.
+  void replaceFromJsonForTest(Map<String, dynamic> j) => _apply(j, replace: true);
 
   ImportSummary _apply(dynamic j, {required bool replace}) {
     if (j is! Map) throw const FormatException('To nie jest plik kopii Dziennika talerza');
@@ -129,6 +157,26 @@ class AppState extends ChangeNotifier {
       eliminations.removeWhere((x) => x.id == e.id);
       eliminations.add(e);
     }
+    // dodatkowe dzienniki: zastąpienie przy przywracaniu, scalanie po id przy imporcie
+    List<T> extra<T>(String key, List<T> cur, T Function(Map<String, dynamic>) f, String Function(T) id) {
+      final raw = j[key];
+      if (raw is! List) return replace ? <T>[] : cur;
+      final list = [for (final e in raw) if (e is Map) f(Map<String, dynamic>.from(e))];
+      if (replace) return list;
+      final out = [...cur];
+      for (final x in list) {
+        out.removeWhere((y) => id(y) == id(x));
+        out.add(x);
+      }
+      return out;
+    }
+
+    favorites = extra('favorites', favorites, Favorite.fromJson, (x) => x.id);
+    recipes = extra('recipes', recipes, Recipe.fromJson, (x) => x.id);
+    allDrinks = extra('drinks', allDrinks, Drink.fromJson, (x) => x.id);
+    allWeights = extra('weights', allWeights, WeightEntry.fromJson, (x) => x.id);
+    allMeds = extra('meds', allMeds, MedEntry.fromJson, (x) => x.id);
+    pantry = extra('pantry', pantry, PantryItem.fromJson, (x) => x.id);
     var added = 0, updated = 0;
     if (replace) {
       if (np.isNotEmpty) people = np;
@@ -238,9 +286,93 @@ class AppState extends ChangeNotifier {
     allMeals.removeWhere((m) => m.person == id);
     allGut.removeWhere((g) => g.person == id);
     gasSources.removeWhere((g) => g.person == id);
+    favorites.removeWhere((x) => x.person == id);
+    allDrinks.removeWhere((x) => x.person == id);
+    allWeights.removeWhere((x) => x.person == id);
+    allMeds.removeWhere((x) => x.person == id);
     people.removeWhere((p) => p.id == id);
     if (activeId == id) activeId = people.first.id;
     await _commit();
+  }
+
+  // ---------- ulubione, przepisy, napoje, waga, leki, spiżarnia ----------
+
+  List<Favorite> get myFavorites =>
+      favorites.where((f) => f.person == active.id).toList()..sort((a, b) => b.lastUsed != a.lastUsed ? b.lastUsed.compareTo(a.lastUsed) : b.uses.compareTo(a.uses));
+  List<Drink> get drinks => allDrinks.where((d) => d.person == active.id).toList();
+  List<WeightEntry> get weights => allWeights.where((w) => w.person == active.id).toList()..sort((a, b) => a.date.compareTo(b.date));
+  List<MedEntry> get meds => allMeds.where((m) => m.person == active.id).toList()..sort((a, b) => a.ts.compareTo(b.ts));
+  List<MedEntry> medsOn(String date) => meds.where((m) => m.date == date).toList();
+
+  Future<void> _upsert<T>(List<T> list, T x, String Function(T) id) async {
+    final i = list.indexWhere((y) => id(y) == id(x));
+    if (i >= 0) {
+      list[i] = x;
+    } else {
+      list.add(x);
+    }
+    await _commit();
+  }
+
+  Future<void> _remove<T>(List<T> list, String id, String Function(T) idOf) async {
+    list.removeWhere((y) => idOf(y) == id);
+    await _commit();
+  }
+
+  Future<void> saveFavorite(Favorite f) => _upsert(favorites, f, (x) => x.id);
+  Future<void> deleteFavorite(String id) => _remove<Favorite>(favorites, id, (x) => x.id);
+  Future<void> saveRecipe(Recipe r) => _upsert(recipes, r, (x) => x.id);
+  Future<void> deleteRecipe(String id) => _remove<Recipe>(recipes, id, (x) => x.id);
+  Future<void> saveDrink(Drink d) => _upsert(allDrinks, d, (x) => x.id);
+  Future<void> deleteDrink(String id) => _remove<Drink>(allDrinks, id, (x) => x.id);
+  Future<void> saveMed(MedEntry m) => _upsert(allMeds, m, (x) => x.id);
+  Future<void> deleteMed(String id) => _remove<MedEntry>(allMeds, id, (x) => x.id);
+  Future<void> savePantry(PantryItem p) => _upsert(pantry, p, (x) => x.id);
+  Future<void> deletePantry(String id) => _remove<PantryItem>(pantry, id, (x) => x.id);
+  Future<void> addPantry(Iterable<PantryItem> items) async {
+    for (final p in items) {
+      pantry.removeWhere((x) => !x.used && x.name.toLowerCase() == p.name.toLowerCase() && x.brand.toLowerCase() == p.brand.toLowerCase());
+      pantry.add(p);
+    }
+    await _commit();
+  }
+
+  /// Nowy pomiar wagi; najnowszy pomiar aktualizuje też wagę w profilu (cel kalorii, białko, woda).
+  Future<void> saveWeight(WeightEntry w) async {
+    allWeights.removeWhere((x) => x.person == w.person && x.date == w.date && x.id != w.id);
+    final i = allWeights.indexWhere((x) => x.id == w.id);
+    if (i >= 0) {
+      allWeights[i] = w;
+    } else {
+      allWeights.add(w);
+    }
+    final mine = allWeights.where((x) => x.person == w.person).toList()..sort((a, b) => a.date.compareTo(b.date));
+    final pi = people.indexWhere((p) => p.id == w.person);
+    if (pi >= 0 && mine.isNotEmpty) people[pi].weight = mine.last.kg;
+    await _commit();
+  }
+
+  Future<void> deleteWeight(String id) => _remove<WeightEntry>(allWeights, id, (x) => x.id);
+
+  /// Posiłek z ulubionego (albo z „to co zwykle”) – teraz, dla wybranej osoby.
+  Future<Meal> addMealFrom({required String name, required List<FoodItem> items, String? type, String? date, String? time}) async {
+    final now = DateTime.now();
+    final m = Meal(
+      id: newId('m'),
+      person: active.id,
+      date: date ?? isoDate(now),
+      time: time ?? hhmm(now),
+      type: type ?? mealTypeFor(now.hour),
+      name: name,
+      items: [for (final i in items) i.copy()],
+    );
+    await saveMeal(m);
+    final f = favorites.where((x) => x.person == active.id && x.name.toLowerCase() == name.toLowerCase());
+    for (final x in f) {
+      x.uses++;
+      x.lastUsed = now.millisecondsSinceEpoch;
+    }
+    return m;
   }
 
   // ---------- posiłki ----------
@@ -272,6 +404,7 @@ class AppState extends ChangeNotifier {
     final m = allMeals.firstWhere((x) => x.id == mealId);
     m.reactions.add(r);
     await _commit();
+    onReaction?.call(mealId);
   }
 
   Future<void> deleteReaction(String mealId, int index) async {

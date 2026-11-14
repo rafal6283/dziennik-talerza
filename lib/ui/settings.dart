@@ -7,6 +7,7 @@ import 'package:koofr_backup_ui/koofr_backup_ui.dart' show KoofrBackupTile;
 import '../ai.dart';
 import '../calc.dart';
 import '../health.dart';
+import '../reminders.dart';
 import '../local_ai.dart';
 import '../main.dart';
 import '../security/lock.dart';
@@ -181,6 +182,84 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  String _hm(int m) => '${(m ~/ 60).toString().padLeft(2, '0')}:${(m % 60).toString().padLeft(2, '0')}';
+
+  Future<void> _setReminder(void Function(ReminderSettings s) change) async {
+    final before = Reminders.settings.any;
+    change(Reminders.settings);
+    if (!before && Reminders.settings.any) {
+      final ok = await Reminders.requestPermission();
+      if (!ok) _snack('Zezwól aplikacji na powiadomienia w ustawieniach telefonu');
+    }
+    await Reminders.saveSettings();
+    if (!Reminders.settings.any) {
+      await Reminders.cancelAll();
+    } else {
+      await Reminders.reschedule(meals: app.meals, gut: app.gut);
+    }
+    if (mounted) setState(() {});
+  }
+
+  Future<int?> _pickTime(int min) async {
+    final t = await showTimePicker(context: context, initialTime: TimeOfDay(hour: min ~/ 60, minute: min % 60));
+    return t == null ? null : t.hour * 60 + t.minute;
+  }
+
+  List<Widget> _reminderTiles() {
+    final r = Reminders.settings;
+    if (!Reminders.supported) return const [];
+    return [
+      SwitchListTile(
+        secondary: const Icon(Icons.wb_sunny_outlined),
+        title: Text('Rano: jak trawienie? (${_hm(r.morningMin)})'),
+        subtitle: const Text('Ocena jednym stuknięciem z powiadomienia, tylko gdy wczoraj są posiłki'),
+        value: r.morning,
+        onChanged: (v) => _setReminder((s) => s.morning = v),
+      ),
+      if (r.morning)
+        ListTile(
+          contentPadding: const EdgeInsets.only(left: 72, right: 16),
+          title: const Text('Godzina porannego pytania'),
+          trailing: Text(_hm(r.morningMin)),
+          onTap: () async {
+            final m = await _pickTime(r.morningMin);
+            if (m != null) await _setReminder((s) => s.morningMin = m);
+          },
+        ),
+      SwitchListTile(
+        secondary: const Icon(Icons.timer_outlined),
+        title: const Text('2 h po posiłku: jak się czujesz?'),
+        subtitle: const Text('Znika, gdy ocenisz posiłek wcześniej'),
+        value: r.afterMeal,
+        onChanged: (v) => _setReminder((s) => s.afterMeal = v),
+      ),
+      SwitchListTile(
+        secondary: const Icon(Icons.dinner_dining_outlined),
+        title: Text('Kolacja zapisana? (${_hm(r.dinnerMin)})'),
+        subtitle: const Text('Tylko gdy kolacji jeszcze nie ma w dzienniku'),
+        value: r.dinner,
+        onChanged: (v) => _setReminder((s) => s.dinner = v),
+      ),
+      if (r.dinner)
+        ListTile(
+          contentPadding: const EdgeInsets.only(left: 72, right: 16),
+          title: const Text('Godzina przypomnienia o kolacji'),
+          trailing: Text(_hm(r.dinnerMin)),
+          onTap: () async {
+            final m = await _pickTime(r.dinnerMin);
+            if (m != null) await _setReminder((s) => s.dinnerMin = m);
+          },
+        ),
+      SwitchListTile(
+        secondary: const Icon(Icons.calendar_view_week),
+        title: const Text('Niedziela: podsumowanie tygodnia'),
+        subtitle: const Text('O 19:30 – kalorie, trawienie, woda, waga'),
+        value: r.weekly,
+        onChanged: (v) => _setReminder((s) => s.weekly = v),
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -295,7 +374,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 if (mounted) setState(() {});
               },
             ),
+          SwitchListTile(
+            secondary: const Icon(Icons.directions_walk),
+            title: const Text('Aktywność z Health Connect'),
+            subtitle: Text(HealthSync.activityOn
+                ? 'Kroki i spalone kalorie osoby „${_hcName()}” w dzienniku i podsumowaniu tygodnia'
+                : 'Kroki i aktywnie spalone kalorie (zegarek, telefon) – do podsumowań i celu kalorii'),
+            value: HealthSync.activityOn,
+            onChanged: (v) async {
+              final ok = await HealthSync.enableActivity(v, person: HealthSync.person ?? app.active.id);
+              if (!ok) _snack('Bez zgody na odczyt kroków i kalorii w Health Connect nie da się tego włączyć');
+              app.refresh();
+              if (mounted) setState(() {});
+            },
+          ),
+          if (HealthSync.activityOn)
+            SwitchListTile(
+              secondary: const Icon(Icons.tune),
+              title: const Text('Doliczaj ruch do celu kalorii'),
+              subtitle: const Text('Połowa aktywnie spalonych kalorii (maks. 600) – zegarki zwykle je zawyżają'),
+              value: HealthSync.adjustGoal,
+              onChanged: (v) async {
+                await HealthSync.setAdjust(v);
+                app.refresh();
+                scheduleSideEffects();
+                if (mounted) setState(() {});
+              },
+            ),
         ],
+        const SectionTitle('Przypomnienia'),
+        ..._reminderTiles(),
+        if (HealthSync.supported)
+          ListTile(
+            leading: const Icon(Icons.widgets_outlined),
+            title: const Text('Widżet na ekranie głównym'),
+            subtitle: const Text('Przytrzymaj puste miejsce na ekranie głównym → Widżety → Dziennik talerza. Pokazuje kalorie i wodę, ma przyciski posiłku, wody i trawienia.'),
+          ),
         const SectionTitle('Dane'),
         const KoofrBackupTile(),
         ListTile(

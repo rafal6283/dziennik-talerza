@@ -103,4 +103,79 @@ class HealthSync {
     if (!supported || !_on) return;
     await deleteMeals([id]);
   }
+
+  // ---------- aktywność (kroki, spalone kalorie) ----------
+
+  static const _kAct = 'hc_activity', _kAdjust = 'hc_adjust';
+  static bool activityOn = false;
+
+  /// Doliczać do celu kalorii połowę aktywnie spalonych kcal (ostrożnie – zegarki zawyżają).
+  static bool adjustGoal = false;
+
+  /// data → (kroki, aktywne kcal); tylko dla osoby powiązanej z Health Connect.
+  static final Map<String, (int, double)> activity = {};
+
+  static Future<void> initActivity() async {
+    if (!supported) return;
+    try {
+      final p = await SharedPreferences.getInstance();
+      activityOn = p.getBool(_kAct) ?? false;
+      adjustGoal = p.getBool(_kAdjust) ?? false;
+      if (_person == null && activityOn) _person = p.getString(_kPerson);
+    } catch (_) {}
+    if (activityOn) await refreshActivity();
+  }
+
+  static Future<bool> enableActivity(bool on, {String? person}) async {
+    if (on) {
+      try {
+        final ok = await _ch.invokeMethod<bool>('requestActivity') ?? false;
+        if (!ok) return false;
+      } catch (_) {
+        return false;
+      }
+    }
+    activityOn = on;
+    if (person != null) _person = person;
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_kAct, on);
+    if (_person != null) await p.setString(_kPerson, _person!);
+    if (on) {
+      await refreshActivity();
+    } else {
+      activity.clear();
+    }
+    return true;
+  }
+
+  static Future<void> setAdjust(bool on) async {
+    adjustGoal = on;
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_kAdjust, on);
+  }
+
+  static Future<void> refreshActivity({int days = 30}) async {
+    if (!supported || !activityOn) return;
+    try {
+      final r = await _ch.invokeMethod<Map>('activity', {'days': days});
+      if (r == null) return;
+      activity.clear();
+      for (final e in r.entries) {
+        final v = e.value;
+        if (v is Map) activity['${e.key}'] = ((v['steps'] as num?)?.toInt() ?? 0, (v['kcal'] as num?)?.toDouble() ?? 0);
+      }
+    } catch (_) {}
+  }
+
+  /// Aktywność danego dnia dla osoby (null gdy to nie osoba z Health Connect albo brak danych).
+  static (int, double)? activityFor(String personId, String date) =>
+      activityOn && personId == _person ? activity[date] : null;
+
+  /// Premia do celu kalorii za aktywność: połowa aktywnie spalonych kcal, maks. 600.
+  static int goalBonus(String personId, String date) {
+    if (!adjustGoal) return 0;
+    final a = activityFor(personId, date);
+    if (a == null) return 0;
+    return (a.$2 / 2).clamp(0, 600).round();
+  }
 }

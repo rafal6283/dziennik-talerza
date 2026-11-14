@@ -30,11 +30,12 @@ class FoodPack {
     if (j is! Map || j['products'] is! List) return const [];
     builtAt = (j['built'] as num?)?.toInt() ?? 0;
     double d(dynamic v) => v is num ? v.toDouble() : 0;
+    double? o(List p, int i) => p.length > i && p[i] is num ? (p[i] as num).toDouble() : null;
     return [
       for (final p in j['products'] as List)
         if (p is List && p.length >= 7 && p[0] is String)
           FoodRef(p[0] as String, const [], d(p[2]), d(p[3]), d(p[4]), d(p[5]), d(p[6]) > 0 ? d(p[6]) : 100, d(p[6]) > 0 ? 'porcja' : '100 g',
-              brand: cleanBrand('${p[1] ?? ''}'), packaged: true),
+              brand: cleanBrand('${p[1] ?? ''}'), packaged: true, fiber: o(p, 7), sugar: o(p, 8), salt: o(p, 9)),
     ];
   }
 

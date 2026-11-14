@@ -1,15 +1,22 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:koofr_backup_ui/koofr_backup_ui.dart' show KoofrBackground, KoofrBackup;
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'koofr_backup.dart';
 import 'food_pack.dart';
+import 'calc.dart';
+import 'extras.dart';
 import 'health.dart';
+import 'reminders.dart';
 import 'security/lock.dart';
 import 'store.dart';
 import 'ui/format.dart';
 import 'ui/home.dart';
 import 'ui/lock_screen.dart';
+import 'widget_bridge.dart';
 
 final AppState app = AppState();
 
@@ -37,10 +44,41 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
   FoodPack.load(); // paczka produktów wczytuje się w tle
   // posiłki wybranej osoby → Health Connect (Samsung Health, Google Fit)
-  HealthSync.init();
-  app.onMealSaved = HealthSync.mealSaved;
-  app.onMealDeleted = HealthSync.mealDeleted;
+  HealthSync.init().then((_) => HealthSync.initActivity()).then((_) => app.refresh());
+  app.onMealSaved = (m) async {
+    await HealthSync.mealSaved(m);
+    await Reminders.afterMeal(m);
+  };
+  app.onMealDeleted = (id) async {
+    await HealthSync.mealDeleted(id);
+    await Reminders.cancelMeal(id);
+  };
+  app.onReaction = Reminders.cancelMeal;
+  // po każdej zmianie danych: widżet na ekranie głównym i plan przypomnień (z opóźnieniem, zbiorczo)
+  app.afterCommit.add(scheduleSideEffects);
+  Reminders.loadSettings().then((_) => Reminders.init());
   runApp(const DziennikApp());
+}
+
+Timer? _sideTimer;
+final bool _inTest = Platform.environment.containsKey('FLUTTER_TEST');
+
+void scheduleSideEffects() {
+  if (_inTest) return;
+  _sideTimer?.cancel();
+  _sideTimer = Timer(const Duration(seconds: 2), () async {
+    if (!app.loaded) return;
+    final today = todayIso();
+    final p = app.active;
+    await HomeWidget.update(
+      person: app.people.length > 1 ? p.name : '',
+      kcal: dayTotal(app.meals, today).kcal.round(),
+      goal: app.goal + HealthSync.goalBonus(p.id, today),
+      waterMl: drinksOn(today, app.drinks, const []).waterMl,
+      waterGoal: waterGoalMl(p),
+    );
+    if (Reminders.settings.any) await Reminders.reschedule(meals: app.meals, gut: app.gut);
+  });
 }
 
 class DziennikApp extends StatelessWidget {
@@ -100,6 +138,7 @@ class _LockGateState extends State<LockGate> with WidgetsBindingObserver {
 
   Future<void> _load() async {
     final results = await Future.wait([Lock.load(), app.load()]);
+    scheduleSideEffects();
     // kopia na Koofr w tle (po wczytaniu danych)
     KoofrBackup.setup(DziennikBackup()).then((_) => KoofrBackground.start(koofrCallback)).ignore();
     final c = results.first as LockConfig;
@@ -124,6 +163,12 @@ class _LockGateState extends State<LockGate> with WidgetsBindingObserver {
     }
     if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) pausedAt ??= DateTime.now();
     if (state == AppLifecycleState.resumed) {
+      if (app.loaded) {
+        HealthSync.refreshActivity().then((_) {
+          app.refresh();
+          scheduleSideEffects();
+        });
+      }
       if (covered) setState(() => covered = false);
       if (pausedAt == null) return;
       final away = DateTime.now().difference(pausedAt!);

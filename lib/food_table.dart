@@ -1,6 +1,7 @@
 // Wbudowana tabela orientacyjnych wartości odżywczych (na 100 g / 100 ml) popularnych produktów i dań w Polsce
 // oraz podpowiedzi z historii wpisów. Działa bez internetu.
 
+import 'extras.dart';
 import 'models.dart';
 
 class FoodRef {
@@ -14,8 +15,18 @@ class FoodRef {
   final String brand; // marka (produkty z Open Food Facts)
   final bool packaged; // produkt z paczki Open Food Facts albo z wyszukiwania online
   final bool searchOnline; // specjalna pozycja „Szukaj w Open Food Facts”
+  final double? fiber, sugar, salt; // na 100 g, null = brak danych
+  final String tag; // 'przepis' | 'spiżarnia' | ''
   FoodRef(this.name, this.aliases, this.kcal, this.protein, this.carbs, this.fat, this.portion, this.portionLabel,
-      {this.mine = false, this.uses = 0, this.brand = '', this.packaged = false, this.searchOnline = false});
+      {this.mine = false,
+      this.uses = 0,
+      this.brand = '',
+      this.packaged = false,
+      this.searchOnline = false,
+      this.fiber,
+      this.sugar,
+      this.salt,
+      this.tag = ''});
 
   String get display => brand.isEmpty ? name : '$name ($brand)';
 
@@ -33,6 +44,9 @@ class FoodRef {
         protein: protein * grams / 100,
         carbs: carbs * grams / 100,
         fat: fat * grams / 100,
+        fiber: fiber == null ? null : fiber! * grams / 100,
+        sugar: sugar == null ? null : sugar! * grams / 100,
+        salt: salt == null ? null : salt! * grams / 100,
       );
 }
 
@@ -430,6 +444,184 @@ chrzan;60;1.5;8;2;10;łyżeczka
 sól;0;0;0;0;1;szczypta
 ''';
 
+
+// nazwa;błonnik;cukry;sól (g na 100 g) – orientacyjnie, dla najczęstszych pozycji tabeli
+const _micro = '''
+chleb żytni;6.5;3;1.2
+chleb pszenny;2.7;4;1.3
+chleb mieszany;4;3.5;1.2
+chleb graham;6;3.5;1.1
+bułka pszenna;2.5;4;1.3
+bułka grahamka;5.5;4;1.2
+rogal maślany;2.5;11;1
+bagietka;2.5;3;1.5
+tortilla pszenna;3;3;1.2
+chałka;2.5;12;0.9
+pieczywo chrupkie;14;2;1.2
+wafle ryżowe;3;0.5;0.1
+płatki owsiane;10;1;0
+płatki kukurydziane;3;8;1.3
+musli;8;18;0.2
+granola;7;20;0.3
+ryż biały ugotowany;0.4;0.1;0
+ryż brązowy ugotowany;1.8;0.4;0
+makaron ugotowany;1.8;0.6;0
+makaron pełnoziarnisty ugotowany;4;0.8;0
+kasza gryczana ugotowana;2.7;0.9;0
+kasza jaglana ugotowana;1.3;0.1;0
+kasza jęczmienna ugotowana;3.8;0.3;0
+kuskus ugotowany;1.4;0.1;0
+komosa ryżowa ugotowana;2.8;0.9;0
+ziemniaki gotowane;1.8;0.9;0
+ziemniaki puree;1.5;1.5;0.4
+frytki;3.8;0.3;0.6
+pierogi ruskie;1.5;1;0.8
+pierogi z mięsem;1.5;1;0.9
+pierogi z kapustą i grzybami;2.5;1.5;0.9
+naleśnik;1;6;0.4
+pizza;2;3.5;1.3
+pierś z kurczaka pieczona;0;0;0.2
+pierś z kurczaka surowa;0;0;0.15
+udko z kurczaka pieczone;0;0;0.3
+kurczak pieczony;0;0;0.4
+kotlet schabowy;0.5;0.5;0.9
+schab pieczony;0;0;0.5
+karkówka pieczona;0;0;0.6
+kotlet mielony;0.5;1;1
+parówki;0;1;2
+szynka;0;1;2.4
+polędwica sopocka;0;1;2.5
+szynka z indyka;0;1;2.2
+kiełbasa;0;1;2.4
+boczek;0;0.5;2.5
+salami;0;0.5;4.5
+kabanos;0;1;3.5
+łosoś pieczony;0;0;0.1
+łosoś wędzony;0;0;3
+dorsz pieczony;0;0;0.2
+tuńczyk w wodzie;0;0;0.9
+jajko;0;0.4;0.35
+jajecznica;0;1;0.8
+mleko 2%;0;4.8;0.1
+mleko 3,2%;0;4.7;0.1
+mleko 0,5%;0;4.9;0.1
+napój owsiany;0.8;4;0.1
+jogurt naturalny;0;5;0.1
+jogurt grecki;0;4;0.1
+skyr;0;3.8;0.1
+kefir;0;4.5;0.1
+jogurt owocowy;0.2;13;0.1
+serek wiejski;0;2;0.6
+twaróg półtłusty;0;3.5;0.1
+twaróg chudy;0;3.5;0.1
+ser żółty;0;0;1.7
+mozzarella;0;1;0.5
+ser feta;0;1;2.7
+masło;0;0.6;0.02
+olej rzepakowy;0;0;0
+pomidor;1.2;2.6;0
+ogórek;0.6;1.7;0
+ogórek kiszony;1;0.5;2.5
+papryka;1.9;4.2;0
+sałata;1.3;0.8;0
+rzodkiewka;1.6;1.9;0
+cebula;1.7;4.2;0
+marchew;2.8;4.7;0.2
+brokuł;2.6;1.7;0
+kalafior;2;1.9;0
+kapusta biała;2.5;3.2;0
+kapusta kiszona;2.5;0.5;1.6
+szpinak;2.2;0.4;0.2
+burak gotowany;2;8;0.2
+fasolka szparagowa;3;2;0
+groszek zielony;5;5.7;0
+kukurydza konserwowa;2.4;5;0.6
+cukinia;1;2.5;0
+pieczarki;1;2;0
+awokado;6.7;0.7;0
+fasola czerwona;6.4;0.5;0.6
+ciecierzyca;7.6;4.8;0.3
+soczewica ugotowana;7.9;1.8;0
+tofu;1;0.6;0
+hummus;6;0.5;1
+jabłko;2.4;10;0
+banan;2.6;12;0
+gruszka;3.1;10;0
+pomarańcza;2.2;9;0
+mandarynka;1.8;10.5;0
+truskawki;2;4.9;0
+borówki;2.4;10;0
+maliny;6.5;4.4;0
+winogrona;0.9;16;0
+śliwki;1.4;10;0
+kiwi;3;9;0
+arbuz;0.4;6;0
+brzoskwinia;1.5;8.4;0
+rodzynki;3.7;59;0
+daktyle suszone;8;63;0
+orzechy włoskie;6.7;2.6;0
+migdały;12.5;4.4;0
+orzeszki ziemne;8.5;4;0.8
+pestki dyni;6;1.4;0
+słonecznik;8.6;2.6;0
+siemię lniane;27;1.6;0.1
+masło orzechowe;6;9;0.4
+nasiona chia;34;0;0
+czekolada mleczna;2;56;0.2
+czekolada gorzka;10;24;0
+herbatniki;2.5;22;0.8
+wafelek w czekoladzie;2.5;35;0.3
+baton czekoladowy;2;50;0.6
+drożdżówka;2;18;0.6
+pączek;1.5;20;0.6
+sernik;0.5;20;0.4
+szarlotka;1.5;20;0.3
+lody śmietankowe;0.5;21;0.2
+chipsy;4;1;1.5
+paluszki słone;3;3;3.5
+miód;0;82;0
+cukier;0;100;0
+dżem;1;50;0
+krem czekoladowy;3.4;56;0.1
+żelki;0;46;0.1
+kawa czarna;0;0;0
+kawa z mlekiem;0;1;0
+cappuccino;0;3;0.1
+latte;0;4;0.1
+herbata;0;0;0
+sok pomarańczowy;0.2;8.5;0
+sok jabłkowy;0.1;10;0
+cola;0;10.6;0
+cola zero;0;0;0
+piwo;0;0.3;0
+wino czerwone;0;0.6;0
+woda;0;0;0
+rosół;0;0.4;0.8
+zupa pomidorowa;0.6;3;0.7
+żurek;0.5;1;0.9
+barszcz czerwony;0.8;3;0.6
+zupa ogórkowa;0.7;1;0.9
+grochówka;3;1;0.8
+zupa jarzynowa;1.2;1.5;0.6
+bigos;2.2;2;1
+gołąbki;1.5;2;0.7
+spaghetti bolognese;1.5;3;0.6
+owsianka;1.5;5;0.1
+kanapka z szynką;2.5;3;1.3
+majonez;0;2;1.2
+ketchup;0.3;22;1.8
+musztarda;3;4;5
+ptasie mleczko;0.5;55;0.1
+krówki;0;65;0.3
+pierniki;2.5;40;0.4
+paluszki rybne;1;1.5;0.8
+kebab;1.5;3;1.2
+hamburger;1.5;5;1.2
+gofr;1;12;0.4
+budyń;0;14;0.1
+kisiel;0;15;0
+''';
+
 List<FoodRef>? _cache;
 
 List<FoodRef> foodTable() => _cache ??= [
@@ -439,9 +631,18 @@ List<FoodRef> foodTable() => _cache ??= [
             final f = line.split(';');
             final names = f[0].split('|').map((s) => s.trim()).toList();
             double n(int i) => double.parse(f[i]);
-            return FoodRef(names.first, names.skip(1).toList(), n(1), n(2), n(3), n(4), n(5), f[6].trim());
+            final mi = _microMap()[names.first];
+            return FoodRef(names.first, names.skip(1).toList(), n(1), n(2), n(3), n(4), n(5), f[6].trim(),
+                fiber: mi?.$1, sugar: mi?.$2, salt: mi?.$3);
           }(),
     ];
+
+Map<String, (double, double, double)>? _microCache;
+Map<String, (double, double, double)> _microMap() => _microCache ??= {
+      for (final line in _micro.split('\n'))
+        if (line.trim().isNotEmpty)
+          if (line.split(';') case [final n, final a, final b, final c]) n.trim(): (double.parse(a), double.parse(b), double.parse(c))
+    };
 
 const _pl = {'ą': 'a', 'ć': 'c', 'ę': 'e', 'ł': 'l', 'ń': 'n', 'ó': 'o', 'ś': 's', 'ź': 'z', 'ż': 'z'};
 
@@ -458,7 +659,8 @@ class FoodIndex {
   final List<FoodRef> refs;
   FoodIndex(this.refs);
 
-  factory FoodIndex.build(Iterable<Meal> meals, {List<FoodRef> pack = const []}) {
+  factory FoodIndex.build(Iterable<Meal> meals,
+      {List<FoodRef> pack = const [], Iterable<Recipe> recipes = const [], Iterable<PantryItem> pantry = const []}) {
     final mine = <String, ({FoodItem item, int uses})>{};
     for (final m in meals.toList()..sort((a, b) => a.ts.compareTo(b.ts))) {
       for (final i in m.items) {
@@ -467,12 +669,33 @@ class FoodIndex {
         mine[k] = (item: i, uses: (mine[k]?.uses ?? 0) + 1); // najnowszy wpis wygrywa
       }
     }
+    mine.removeWhere((k, _) => recipes.any((r) => normalizeFood(r.name) == k));
+    double? per(double? v, double g) => v == null ? null : v * 100 / g;
     final refs = <FoodRef>[
+      // własne przepisy i spiżarnia na górze podpowiedzi
+      for (final r in recipes)
+        if (r.weight > 0 && r.items.isNotEmpty)
+          FoodRef(r.name, const [], r.per100.kcal, r.per100.p, r.per100.c, r.per100.f, r.portion > 0 ? r.portion : 250, 'porcja',
+              mine: true,
+              uses: 3,
+              tag: 'przepis',
+              fiber: r.micro.coverage > 0 ? r.micro.fiber * 100 / r.weight : null,
+              sugar: r.micro.coverage > 0 ? r.micro.sugar * 100 / r.weight : null,
+              salt: r.micro.coverage > 0 ? r.micro.salt * 100 / r.weight : null),
+      for (final p in pantry)
+        if (!p.used && p.kcal > 0)
+          FoodRef(p.name, const [], p.kcal, p.protein, p.carbs, p.fat, p.portion, p.portion == 100 ? '100 g' : 'porcja',
+              brand: p.brand, mine: true, uses: 2, tag: 'spiżarnia', fiber: p.fiber, sugar: p.sugar, salt: p.salt),
       for (final e in mine.values)
         FoodRef(e.item.name.trim(), const [], e.item.kcal * 100 / e.item.grams, e.item.protein * 100 / e.item.grams,
-            e.item.carbs * 100 / e.item.grams, e.item.fat * 100 / e.item.grams, e.item.grams, 'ostatnio', mine: true, uses: e.uses),
+            e.item.carbs * 100 / e.item.grams, e.item.fat * 100 / e.item.grams, e.item.grams, 'ostatnio',
+            mine: true,
+            uses: e.uses,
+            fiber: per(e.item.fiber, e.item.grams),
+            sugar: per(e.item.sugar, e.item.grams),
+            salt: per(e.item.salt, e.item.grams)),
     ];
-    final mineKeys = mine.keys.toSet();
+    final mineKeys = mine.keys.toSet()..addAll(recipes.map((r) => normalizeFood(r.name)));
     refs.addAll(foodTable().where((r) => !mineKeys.contains(normalizeFood(r.name))));
     refs.addAll(pack.where((r) => !mineKeys.contains(normalizeFood(r.display))));
     return FoodIndex(refs);

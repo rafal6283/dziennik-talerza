@@ -10,6 +10,8 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        // przypomnienia (flutter_local_notifications) wymagają desugaringu bibliotek Javy
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -61,6 +63,7 @@ flutter {
 }
 
 dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     // Posiłki → Health Connect (Samsung Health, Google Fit)
     implementation("androidx.health.connect:connect-client:1.1.0-alpha07")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")

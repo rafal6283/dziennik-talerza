@@ -189,3 +189,16 @@ List<(String, int, double)> gutFrequency(List<GutEntry> gut) {
   out.sort((a, b) => b.$2.compareTo(a.$2));
   return out;
 }
+
+/// Typ posiłku wg godziny.
+String mealTypeFor(int h) => h < 10
+    ? 'Śniadanie'
+    : h < 12
+        ? 'Drugie śniadanie'
+        : h < 16
+            ? 'Obiad'
+            : h < 18
+                ? 'Podwieczorek'
+                : h < 22
+                    ? 'Kolacja'
+                    : 'Przekąska';

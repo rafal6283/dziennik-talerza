@@ -8,6 +8,10 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
+import androidx.health.connect.client.records.StepsRecord
+import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
+import androidx.health.connect.client.time.TimeRangeFilter
 import androidx.health.connect.client.records.MealType
 import androidx.health.connect.client.records.NutritionRecord
 import androidx.health.connect.client.records.metadata.Metadata
@@ -20,6 +24,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.time.LocalDate
+import java.time.Period
 import java.time.ZoneId
 
 /**
@@ -32,24 +38,35 @@ class HealthBridge(private val activity: ComponentActivity) {
         private const val TAG = "DziennikHC"
         private const val PROVIDER = "com.google.android.apps.healthdata"
         val PERMS = setOf(HealthPermission.getWritePermission(NutritionRecord::class))
+        val ACTIVITY = setOf(
+            HealthPermission.getReadPermission(StepsRecord::class),
+            HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
+        )
         fun recordId(mealId: String) = "dziennik-meal-$mealId"
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var pending: MethodChannel.Result? = null
+    private var pendingPerms: Set<String> = PERMS
 
     private val launcher: ActivityResultLauncher<Set<String>> =
         activity.registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
             val r = pending ?: return@registerForActivityResult
             pending = null
-            r.success(granted.containsAll(PERMS))
+            r.success(granted.containsAll(pendingPerms))
         }
 
     fun handle(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "status" -> result.success(status())
             "hasPermission" -> scope.launch { result.success(granted()) }
-            "requestPermission" -> request(result)
+            "requestPermission" -> request(result, PERMS)
+            "hasActivity" -> scope.launch { result.success(granted(ACTIVITY)) }
+            "requestActivity" -> request(result, ACTIVITY)
+            "activity" -> {
+                val days = call.argument<Int>("days") ?: 14
+                scope.launch { result.success(activity(days)) }
+            }
             "writeMeals" -> {
                 val meals = call.argument<List<Map<String, Any?>>>("meals") ?: emptyList()
                 scope.launch { result.success(write(meals)) }
@@ -68,15 +85,15 @@ class HealthBridge(private val activity: ComponentActivity) {
         else -> "unavailable"
     }
 
-    private suspend fun granted(): Boolean = try {
+    private suspend fun granted(perms: Set<String> = PERMS): Boolean = try {
         status() == "available" &&
-            HealthConnectClient.getOrCreate(activity).permissionController.getGrantedPermissions().containsAll(PERMS)
+            HealthConnectClient.getOrCreate(activity).permissionController.getGrantedPermissions().containsAll(perms)
     } catch (e: Exception) {
         Log.w(TAG, "Uprawnienia", e)
         false
     }
 
-    private fun request(result: MethodChannel.Result) {
+    private fun request(result: MethodChannel.Result, perms: Set<String>) {
         when (status()) {
             "update" -> {
                 try {
@@ -94,13 +111,14 @@ class HealthBridge(private val activity: ComponentActivity) {
             }
         }
         scope.launch {
-            if (granted()) {
+            if (granted(perms)) {
                 result.success(true)
                 return@launch
             }
             pending?.success(false)
             pending = result
-            launcher.launch(PERMS)
+            pendingPerms = perms
+            launcher.launch(perms)
         }
     }
 
@@ -148,6 +166,33 @@ class HealthBridge(private val activity: ComponentActivity) {
         } catch (e: Exception) {
             Log.w(TAG, "Zapis posiłków", e)
             -1
+        }
+    }
+
+    /** Kroki i aktywne kalorie z ostatnich [days] dni: data (yyyy-MM-dd) → {steps, kcal}. Null bez zgody. */
+    private suspend fun activity(days: Int): Map<String, Map<String, Any>>? {
+        if (!granted(ACTIVITY)) return null
+        return try {
+            val end = LocalDate.now().plusDays(1).atStartOfDay()
+            val start = LocalDate.now().minusDays((days - 1).toLong()).atStartOfDay()
+            val groups = HealthConnectClient.getOrCreate(activity).aggregateGroupByPeriod(
+                AggregateGroupByPeriodRequest(
+                    metrics = setOf(StepsRecord.COUNT_TOTAL, ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
+                    timeRangeFilter = TimeRangeFilter.between(start, end),
+                    timeRangeSlicer = Period.ofDays(1),
+                )
+            )
+            val out = HashMap<String, Map<String, Any>>()
+            for (g in groups) {
+                val steps = g.result[StepsRecord.COUNT_TOTAL] ?: 0L
+                val kcal = g.result[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories ?: 0.0
+                if (steps == 0L && kcal == 0.0) continue
+                out[g.startTime.toLocalDate().toString()] = mapOf("steps" to steps, "kcal" to kcal)
+            }
+            out
+        } catch (e: Exception) {
+            Log.w(TAG, "Aktywność", e)
+            null
         }
     }
 

@@ -8,6 +8,7 @@ import '../calc.dart';
 import '../fodmap.dart';
 import '../food_db.dart';
 import '../food_pack.dart';
+import '../extras.dart';
 import '../food_table.dart';
 import '../main.dart';
 import '../models.dart';
@@ -34,9 +35,16 @@ class _ItemCtl {
   /// Wartości na 100 g – przy zmianie gramatury kcal i makro przeliczają się same.
   Macros? per100;
   FoodRef? ref; // wybrana podpowiedź (porcja do szybkich przycisków)
+  /// Błonnik, cukry, sól na 100 g (null = brak danych) – skalowane z gramaturą.
+  double? fiber100, sugar100, salt100;
 
   _ItemCtl([FoodItem? i]) {
     if (i == null) return;
+    if (i.grams > 0) {
+      fiber100 = i.fiber == null ? null : i.fiber! * 100 / i.grams;
+      sugar100 = i.sugar == null ? null : i.sugar! * 100 / i.grams;
+      salt100 = i.salt == null ? null : i.salt! * 100 / i.grams;
+    }
     name.text = i.name;
     grams.text = numInput(i.grams);
     kcal.text = _fmtKcal(i.kcal);
@@ -79,6 +87,9 @@ class _ItemCtl {
     ref = r;
     name.text = r.display;
     per100 = Macros(r.kcal, r.protein, r.carbs, r.fat);
+    fiber100 = r.fiber;
+    sugar100 = r.sugar;
+    salt100 = r.salt;
     if (g <= 0) grams.text = numInput(r.portion);
     gramsChanged();
   }
@@ -95,6 +106,9 @@ class _ItemCtl {
         protein: parseNum(p.text) ?? 0,
         carbs: parseNum(c.text) ?? 0,
         fat: parseNum(f.text) ?? 0,
+        fiber: fiber100 == null ? null : fiber100! * g / 100,
+        sugar: sugar100 == null ? null : sugar100! * g / 100,
+        salt: salt100 == null ? null : salt100! * g / 100,
       );
   void dispose() {
     for (final x in [name, grams, kcal, p, c, f]) {
@@ -108,7 +122,10 @@ class MealForm extends StatefulWidget {
   final String date;
   final Meal? meal; // edycja
   final Meal? copyOf; // „zjedz ponownie”
-  const MealForm({super.key, required this.date, this.meal, this.copyOf});
+  final bool recipeMode; // edytor własnego przepisu (cały garnek)
+  final Recipe? recipe;
+  final String? initialType;
+  const MealForm({super.key, required this.date, this.meal, this.copyOf, this.recipeMode = false, this.recipe, this.initialType});
   @override
   State<MealForm> createState() => _MealFormState();
 }
@@ -117,7 +134,13 @@ class _MealFormState extends State<MealForm> {
   final desc = TextEditingController();
   final name = TextEditingController();
   final items = <_ItemCtl>[];
-  late FoodIndex index = FoodIndex.build(app.allMeals, pack: FoodPack.cached ?? const []);
+  late FoodIndex index = _buildIndex(FoodPack.cached ?? const []);
+  final cooked = TextEditingController(); // waga gotowego dania (przepis)
+  final portions = TextEditingController(text: '1');
+  bool favorite = false;
+
+  FoodIndex _buildIndex(List<FoodRef> pack) => FoodIndex.build(app.allMeals,
+      pack: pack, recipes: app.recipes.where((r) => r.id != widget.recipe?.id), pantry: app.pantry);
   late String date;
   late String time;
   late String type;
@@ -139,7 +162,20 @@ class _MealFormState extends State<MealForm> {
     final now = DateTime.now();
     date = widget.meal?.date ?? widget.date;
     time = widget.meal?.time ?? hhmm(now);
-    type = src?.type ?? _guessType(now.hour);
+    type = src?.type ?? widget.initialType ?? _guessType(now.hour);
+    final r = widget.recipe;
+    if (r != null) {
+      name.text = r.name;
+      desc.text = r.note;
+      for (final i in r.items) {
+        items.add(_ItemCtl(i));
+      }
+      if (r.cookedGrams > 0) cooked.text = numInput(r.cookedGrams);
+      portions.text = '${r.portions}';
+    }
+    if (src != null && !widget.recipeMode) {
+      favorite = app.myFavorites.any((f) => f.name.toLowerCase() == src.name.trim().toLowerCase());
+    }
     if (src != null) {
       name.text = src.name;
       desc.text = src.desc;
@@ -150,7 +186,7 @@ class _MealFormState extends State<MealForm> {
     }
     if (FoodPack.cached == null) {
       FoodPack.load().then((p) {
-        if (mounted) setState(() => index = FoodIndex.build(app.allMeals, pack: p));
+        if (mounted) setState(() => index = _buildIndex(p));
       });
     }
     Future.wait([Ai.enabled(), Ai.isLocal(), Ai.setupHint()]).then((r) {
@@ -178,6 +214,8 @@ class _MealFormState extends State<MealForm> {
 
   @override
   void dispose() {
+    cooked.dispose();
+    portions.dispose();
     desc.dispose();
     name.dispose();
     for (final i in items) {
@@ -358,12 +396,33 @@ class _MealFormState extends State<MealForm> {
         ),
       );
 
+  Future<void> _saveRecipe(List<FoodItem> its) async {
+    final n = name.text.trim();
+    if (n.isEmpty) {
+      _status('Nadaj przepisowi nazwę, np. „Bigos mamy”.', err: true);
+      return;
+    }
+    final r = Recipe(
+      id: widget.recipe?.id ?? newId('rec'),
+      name: n,
+      note: desc.text.trim(),
+      items: its,
+      cookedGrams: parseNum(cooked.text) ?? 0,
+      portions: int.tryParse(portions.text.trim()) ?? 1,
+    );
+    await app.saveRecipe(r);
+    if (!mounted) return;
+    Navigator.pop(context);
+    toast(context, 'Zapisano przepis „$n”. Znajdziesz go w podpowiedziach składników.');
+  }
+
   Future<void> _save() async {
     final its = items.map((c) => c.item).where((i) => i.name.isNotEmpty).toList();
     if (its.isEmpty) {
       _status('Dodaj przynajmniej jeden składnik.', err: true);
       return;
     }
+    if (widget.recipeMode) return _saveRecipe(its);
     setState(() => busy = true);
     var photo = photoName;
     if (newPhoto != null) photo = await app.savePhoto(newPhoto!);
@@ -383,6 +442,19 @@ class _MealFormState extends State<MealForm> {
       extra: old?.extra,
     );
     await app.saveMeal(m);
+    // ulubione: zapis / aktualizacja zestawu składników
+    final favs = app.favorites.where((f) => f.person == m.person && f.name.toLowerCase() == m.name.toLowerCase()).toList();
+    if (favorite) {
+      final f = favs.isNotEmpty ? favs.first : Favorite(id: newId('fav'), person: m.person, name: m.name);
+      f
+        ..items = [for (final i in its) i.copy()]
+        ..type = m.type;
+      await app.saveFavorite(f);
+    } else {
+      for (final f in favs) {
+        await app.deleteFavorite(f.id);
+      }
+    }
     if (!mounted) return;
     Navigator.pop(context);
     final el = app.activeElimination;
@@ -394,12 +466,68 @@ class _MealFormState extends State<MealForm> {
     }
   }
 
+  /// Szybkie wstawienie ulubionego zestawu albo przepisu.
+  Widget _quickFavs() {
+    final favs = app.myFavorites.take(8).toList();
+    final recs = app.recipes.take(6).toList();
+    if (favs.isEmpty && recs.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Wrap(spacing: 6, runSpacing: 6, children: [
+        for (final f in favs)
+          ActionChip(
+            avatar: const Icon(Icons.star, size: 16),
+            label: Text(f.name),
+            onPressed: () => setState(() {
+              name.text = f.name;
+              if (f.type.isNotEmpty) type = f.type;
+              for (final i in f.items) {
+                items.add(_ItemCtl(i.copy()));
+              }
+            }),
+          ),
+        for (final r in recs)
+          ActionChip(
+            avatar: const Icon(Icons.menu_book_outlined, size: 16),
+            label: Text('${r.name} · porcja'),
+            onPressed: () => setState(() {
+              if (name.text.trim().isEmpty) name.text = r.name;
+              items.add(_ItemCtl(r.portionItem()));
+            }),
+          ),
+      ]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final total = Macros.ofItems(items.map((c) => c.item));
+    final micro = Micro.ofItems(items.map((c) => c.item));
+    final rawGrams = items.fold<double>(0, (a, c) => a + c.g);
     return Scaffold(
-      appBar: AppBar(title: Text(widget.meal != null ? 'Edytuj posiłek' : 'Nowy posiłek')),
+      appBar: AppBar(
+        title: Text(widget.recipeMode ? (widget.recipe != null ? 'Edytuj przepis' : 'Nowy przepis') : (widget.meal != null ? 'Edytuj posiłek' : 'Nowy posiłek')),
+        actions: [
+          if (!widget.recipeMode)
+            IconButton(
+              tooltip: favorite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych',
+              icon: Icon(favorite ? Icons.star : Icons.star_border),
+              onPressed: () => setState(() => favorite = !favorite),
+            ),
+          if (widget.recipeMode && widget.recipe != null)
+            IconButton(
+              tooltip: 'Usuń przepis',
+              icon: const Icon(Icons.delete_outline),
+              onPressed: () async {
+                if (await confirm(context, 'Usunąć przepis?', '„${widget.recipe!.name}” zniknie z podpowiedzi. Zapisane posiłki zostają.')) {
+                  await app.deleteRecipe(widget.recipe!.id);
+                  if (context.mounted) Navigator.pop(context);
+                }
+              },
+            ),
+        ],
+      ),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 120), children: [
         // zdjęcie
         Row(children: [
@@ -459,6 +587,7 @@ class _MealFormState extends State<MealForm> {
             ),
           ),
         const SizedBox(height: 12),
+        if (!widget.recipeMode) ...[
         DropdownButtonFormField<String>(
               value: type,
               isExpanded: true,
@@ -489,6 +618,7 @@ class _MealFormState extends State<MealForm> {
             label: Text(time),
           ),
         ]),
+        ],
         const SizedBox(height: 16),
         if (aiOn)
           FilledButton.icon(
@@ -501,7 +631,10 @@ class _MealFormState extends State<MealForm> {
         if (statusErr && lastRaw != null && lastRaw!.isNotEmpty)
           Align(alignment: Alignment.centerLeft, child: TextButton(onPressed: _showRaw, child: const Text('Pokaż odpowiedź modelu'))),
         const SizedBox(height: 12),
-        TextField(controller: name, textCapitalization: TextCapitalization.sentences, decoration: const InputDecoration(labelText: 'Nazwa posiłku', hintText: 'np. Owsianka z bananem')),
+        TextField(controller: name, textCapitalization: TextCapitalization.sentences, decoration: InputDecoration(
+                labelText: widget.recipeMode ? 'Nazwa przepisu' : 'Nazwa posiłku',
+                hintText: widget.recipeMode ? 'np. Bigos mamy' : 'np. Owsianka z bananem')),
+        if (!widget.recipeMode && widget.meal == null && widget.copyOf == null && items.isEmpty) _quickFavs(),
         SectionTitle('Składniki', trailing: TextButton.icon(onPressed: () => setState(() => items.add(_ItemCtl())), icon: const Icon(Icons.add), label: const Text('Składnik'))),
         if (items.isEmpty)
           Text('Brak składników. ${aiOn ? 'Zrób zdjęcie, podyktuj opis albo dodaj składnik ręcznie.' : 'Dodaj składnik ręcznie.'}', style: TextStyle(color: cs.onSurfaceVariant)),
@@ -511,20 +644,68 @@ class _MealFormState extends State<MealForm> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(color: cs.surfaceContainer, borderRadius: BorderRadius.circular(12)),
-          child: Row(children: [
-            Text('Razem', style: TextStyle(color: cs.onSurfaceVariant)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text('${total.kcal.round()} kcal · B ${total.p.round()} · W ${total.c.round()} · T ${total.f.round()}',
-                  textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w700, fontFeatures: tabular)),
-            ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              Text(widget.recipeMode ? 'Cały garnek' : 'Razem', style: TextStyle(color: cs.onSurfaceVariant)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text('${total.kcal.round()} kcal · B ${total.p.round()} · W ${total.c.round()} · T ${total.f.round()}',
+                    textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w700, fontFeatures: tabular)),
+              ),
+            ]),
+            if (micro.coverage > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                    'błonnik ${micro.fiber.toStringAsFixed(1)} g · cukry ${micro.sugar.toStringAsFixed(1)} g · sól ${micro.salt.toStringAsFixed(1)} g'
+                    '${micro.coverage < 0.95 ? ' (dane dla ${(micro.coverage * 100).round()}% kalorii)' : ''}',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant, fontFeatures: tabular)),
+              ),
           ]),
         ),
+        if (widget.recipeMode) ...[
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(
+              child: TextField(
+                controller: cooked,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                    labelText: 'Waga gotowego dania (g)', helperText: 'Pusta = suma składników (${rawGrams.round()} g)', helperMaxLines: 2),
+                onChanged: (_) => setState(() {}),
+              ),
+            ),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 110,
+              child: TextField(
+                controller: portions,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Porcji'),
+                onChanged: (_) => setState(() {}),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 8),
+          Text(
+            () {
+              final w = (parseNum(cooked.text) ?? 0) > 0 ? parseNum(cooked.text)! : rawGrams;
+              final n = int.tryParse(portions.text.trim()) ?? 1;
+              if (w <= 0) return 'Dodaj składniki całego garnka.';
+              return '${(total.kcal * 100 / w).round()} kcal na 100 g gotowego dania · porcja ${(w / (n < 1 ? 1 : n)).round()} g = ${(total.kcal / (n < 1 ? 1 : n)).round()} kcal';
+            }(),
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+          ),
+        ],
       ]),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: FilledButton(onPressed: busy ? null : _save, style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)), child: const Text('Zapisz posiłek')),
+          child: FilledButton(
+              onPressed: busy ? null : _save,
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+              child: Text(widget.recipeMode ? 'Zapisz przepis' : 'Zapisz posiłek')),
         ),
       ),
     );
@@ -558,7 +739,7 @@ class _MealFormState extends State<MealForm> {
                       onTap: () => Navigator.pop(
                         c,
                         FoodRef(p.name, const [], p.kcal100, p.protein100, p.carbs100, p.fat100, p.serving ?? 100, p.serving != null ? 'porcja' : '100 g',
-                            brand: p.brand, packaged: true),
+                            brand: p.brand, packaged: true, fiber: p.fiber100, sugar: p.sugar100, salt: p.salt100),
                       ),
                     ),
                 ]);

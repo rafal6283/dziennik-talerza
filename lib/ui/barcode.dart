@@ -147,7 +147,17 @@ class _AmountDialogState extends State<_AmountDialog> {
               ? null
               : () => Navigator.pop(
                     context,
-                    FoodItem(name: p.label, grams: g, kcal: p.kcal100 * f, protein: p.protein100 * f, carbs: p.carbs100 * f, fat: p.fat100 * f),
+                    FoodItem(
+                      name: p.label,
+                      grams: g,
+                      kcal: p.kcal100 * f,
+                      protein: p.protein100 * f,
+                      carbs: p.carbs100 * f,
+                      fat: p.fat100 * f,
+                      fiber: p.fiber100 == null ? null : p.fiber100! * f,
+                      sugar: p.sugar100 == null ? null : p.sugar100! * f,
+                      salt: p.salt100 == null ? null : p.salt100! * f,
+                    ),
                   ),
           child: const Text('Dodaj'),
         ),

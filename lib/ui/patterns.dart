@@ -35,7 +35,7 @@ class _PatternsTabState extends State<PatternsTab> {
       err = null;
     });
     try {
-      final t = await Ai.analyze(p, app.meals, app.gut, gas: app.gasSeries);
+      final t = await Ai.analyze(p, app.meals, app.gut, gas: app.gasSeries, meds: app.meds, drinks: app.drinks);
       setState(() => _ai[p.id] = t);
     } on AiError catch (e) {
       setState(() => err = e.message);

@@ -36,6 +36,9 @@ SELECT
   list_filter(nutriments, lambda x: x.name = 'proteins')[1]."100g" AS prot,
   list_filter(nutriments, lambda x: x.name = 'carbohydrates')[1]."100g" AS carb,
   list_filter(nutriments, lambda x: x.name = 'fat')[1]."100g" AS fat,
+  list_filter(nutriments, lambda x: x.name = 'fiber')[1]."100g" AS fiber,
+  list_filter(nutriments, lambda x: x.name = 'sugars')[1]."100g" AS sugars,
+  list_filter(nutriments, lambda x: x.name = 'salt')[1]."100g" AS salt,
   serving_quantity,
   coalesce(unique_scans_n, 0) AS scans
 FROM pl
@@ -53,7 +56,7 @@ def num(v):
 
 PL_CHARS = re.compile('[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]')
 seen = {}
-for name, polish, brands, kcal, kj, prot, carb, fat, serving, scans in rows:
+for name, polish, brands, kcal, kj, prot, carb, fat, fiber, sugars, salt, serving, scans in rows:
     name = (name or '').strip()
     kcal = num(kcal)
     if kcal is None and num(kj):
@@ -68,6 +71,12 @@ for name, polish, brands, kcal, kj, prot, carb, fat, serving, scans in rows:
     rank = (scans or 0) * (3 if pl else 1)
     key = (name.lower(), brand.lower())
     row = [name[:80], brand[:40], kcal, prot, carb, fat, s if s and 0 < s < 2000 else 0]
+    # błonnik, cukry, sól (indeksy 7–9; null = brak danych, końcowe null-e obcięte)
+    micro = [num(fiber), num(sugars), num(salt)]
+    micro = [v if v is not None and 0 <= v <= 100 else None for v in micro]
+    while micro and micro[-1] is None:
+        micro.pop()
+    row += micro
     if key not in seen or rank > seen[key][0]:
         seen[key] = (rank, row)
 

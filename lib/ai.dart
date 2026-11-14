@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'calc.dart';
+import 'extras.dart';
 import 'food_table.dart';
 import 'gas.dart';
 import 'local_ai.dart';
@@ -388,16 +389,38 @@ Odpowiedz wyłącznie JSON-em: {"energy":3,"satiety":4,"symptoms":["senność"],
     return 'Posiłki:\n${cut(lines, mealChars)}\n\nWpisy o trawieniu (często z rana, dotyczą posiłków z poprzedniego dnia; reakcje bywają opóźnione o 6–30 godzin):\n${gl.isEmpty ? 'brak' : cut(gl, gutChars)}';
   }
 
-  static Future<String> analyze(Person p, List<Meal> meals, List<GutEntry> gut, {GasSeries? gas}) async {
+  /// Leki/suplementy, napoje i sen – osobno od posiłków (żeby nie mylić ich ze składnikami).
+  static String extrasText(String since, {List<MedEntry> meds = const [], List<Drink> drinks = const [], Map<String, double> sleep = const {}, int maxChars = 4000}) {
+    final out = <String>[];
+    final ms = meds.where((m) => m.date.compareTo(since) >= 0).toList();
+    if (ms.isNotEmpty) {
+      out.add('Leki i suplementy:\n${ms.map((m) => '${m.date} ${m.time} ${m.kind}: ${m.name}${m.dose.isNotEmpty ? ' ${m.dose}' : ''}').join('\n')}');
+    }
+    final days = {for (final d in drinks) if (d.date.compareTo(since) >= 0) d.date}.toList()..sort();
+    if (days.isNotEmpty) {
+      out.add('Napoje poza posiłkami (dziennie):\n${days.map((d) {
+        final x = drinksOn(d, drinks, const []);
+        return '$d: woda ${x.waterMl} ml, wszystkie ${x.allMl} ml, kawy ${x.coffees}';
+      }).join('\n')}');
+    }
+    final sl = sleep.entries.where((e) => e.key.compareTo(since) >= 0).toList()..sort((a, b) => a.key.compareTo(b.key));
+    if (sl.isNotEmpty) out.add('Sen z Rytmu Snu (noc po dniu):\n${sl.map((e) => '${e.key}: ${e.value.toStringAsFixed(1)} h').join('\n')}');
+    final t = out.join('\n\n');
+    return t.length > maxChars ? t.substring(t.length - maxChars) : t;
+  }
+
+  static Future<String> analyze(Person p, List<Meal> meals, List<GutEntry> gut,
+      {GasSeries? gas, List<MedEntry> meds = const [], List<Drink> drinks = const []}) async {
     // model na telefonie ma małe okno kontekstu (4096 tokenów) – dostaje 14 dni i skrócony dziennik
     final local = await isLocal();
     final days = local ? 14 : 30;
     final since = shiftDay(todayIso(), -days);
+    final extras = extrasText(since, meds: meds, drinks: drinks, sleep: gas?.sleepHours ?? const {}, maxChars: local ? 700 : 4000);
     final prompt = '''Oto dziennik posiłków z ostatnich $days dni osoby o imieniu ${p.name} i to, jak się czuła po jedzeniu.
 Dane osoby: ${personLine(p)}.
 Uwzględnij wiek, płeć, masę ciała, aktywność, cel i uwagi przy ocenie kalorii, białka i objawów (np. inne potrzeby nastolatka, osoby starszej, kobiety i mężczyzny; nietolerancje z uwag). Jeśli danych osoby brakuje, napisz, które warto uzupełnić. Zwracaj się bezpośrednio do tej osoby.
 
-${local ? journalText(p, meals, gut, since, mealChars: 5200, gutChars: 1800) : journalText(p, meals, gut, since)}${gas != null && gas.any ? '\n\nLiczba wiatrów z aplikacji użytkownika (Kreska – ręczne wpisy w ciągu dnia, Rytm Snu – wykryte w nocy). Traktuj je jako miarę skutków jedzenia z poprzednich 6–30 godzin:\n${() { final g = gasLines(gas!, since, todayIso()); return local && g.length > 900 ? g.substring(g.length - 900) : g; }()}' : ''}
+${local ? journalText(p, meals, gut, since, mealChars: 5200, gutChars: 1800) : journalText(p, meals, gut, since)}${gas != null && gas.any ? '\n\nLiczba wiatrów z aplikacji użytkownika (Kreska – ręczne wpisy w ciągu dnia, Rytm Snu – wykryte w nocy). Traktuj je jako miarę skutków jedzenia z poprzednich 6–30 godzin:\n${() { final g = gasLines(gas!, since, todayIso()); return local && g.length > 900 ? g.substring(g.length - 900) : g; }()}' : ''}${extras.isNotEmpty ? '\n\n$extras\nLeki i suplementy też mogą wpływać na trawienie – uwzględnij je, ale nie oceniaj leczenia.' : ''}
 
 Przeanalizuj to po polsku, zwięźle (maks. ok. ${local ? 200 : 300} słów), zwykłym tekstem bez nagłówków markdown i bez gwiazdek:
 1. 2–4 najwyraźniejsze zależności między jedzeniem a samopoczuciem i trawieniem (także opóźnione, z dnia na dzień)${gas != null && gas.any ? ', w tym z liczbą wiatrów' : ''}, z liczbą przypadków, na których się opierasz.

@@ -21,6 +21,10 @@ dependencies:
   image_picker: ^1.1.2
   speech_to_text: ^7.0.0
   mobile_scanner: ^7.0.0
+  flutter_local_notifications: 22.3.3
+  timezone: ^0.11.0
+  pdf: ^3.11.3
+  share_plus: ^13.0.0
   flutter_edge_ai: ^2.5.1
   flutter_edge_ai_litertlm: ^1.17.0
   koofr_backup_ui:
@@ -42,6 +46,8 @@ flutter:
   uses-material-design: true
   assets:
     - assets/off_pl.json.gz
+    - assets/fonts/DejaVuSans.ttf
+    - assets/fonts/DejaVuSans-Bold.ttf
 
 flutter_launcher_icons:
   android: true

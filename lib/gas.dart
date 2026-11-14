@@ -245,6 +245,17 @@ class GasSeries {
 
   bool get any => kreska != null || night != null;
 
+  /// Długość nagranego snu (godziny) według wieczoru, po którym była noc – z Rytmu Snu.
+  Map<String, double> get sleepHours {
+    final out = <String, double>{};
+    for (final w in night?.windows ?? const <(int, int)>[]) {
+      final d = nightDate(w.$1);
+      out[d] = (out[d] ?? 0) + (w.$2 - w.$1) / 3600000.0;
+    }
+    out.removeWhere((_, h) => h < 2 || h > 16);
+    return out;
+  }
+
   /// Wiatry w ciągu dnia z Kreski (0 w dniach bez wpisu w zakresie pliku), null poza zakresem.
   int? day(String date) {
     final k = kreska;

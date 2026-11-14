@@ -3,11 +3,16 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../calc.dart';
+import '../extras.dart';
+import '../health.dart';
 import '../main.dart';
 import '../models.dart';
+import '../reminders.dart';
+import '../widget_bridge.dart';
 import 'imported.dart';
 import 'charts.dart';
 import 'elimination_screen.dart';
+import 'extras_ui.dart';
 import 'format.dart';
 import 'gut_form.dart';
 import 'meal_form.dart';
@@ -27,6 +32,71 @@ class _HomeScreenState extends State<HomeScreen> {
   String day = todayIso();
 
   @override
+  void initState() {
+    super.initState();
+    HomeWidget.onAction = (a) => _run(() => _widgetAction(a));
+    HomeWidget.bind();
+    Reminders.onTap = (p, a) => _run(() => _notification(p, a));
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final w = await HomeWidget.takeAction();
+      if (w != null) await _run(() => _widgetAction(w));
+      final n = Reminders.takeLaunch();
+      if (n != null) await _run(() => _notification(n.$1, n.$2));
+    });
+  }
+
+  Future<void> _run(Future<void> Function() f) async {
+    for (var i = 0; i < 100 && !app.loaded; i++) {
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+    if (!mounted || !app.loaded) return;
+    setState(() {
+      tab = 0;
+      day = todayIso();
+    });
+    await f();
+  }
+
+  void _push(Widget w) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => w));
+
+  Future<void> _widgetAction(String a) async {
+    switch (a) {
+      case 'meal':
+        _push(MealForm(date: todayIso()));
+      case 'gut':
+        _push(GutForm(date: todayIso()));
+      case 'water':
+        final d = Drink(id: newId('d'), person: app.active.id, date: todayIso(), time: hhmm(DateTime.now()), kind: 'woda', ml: 250);
+        await app.saveDrink(d);
+        if (mounted) toast(context, 'Dodano szklankę wody (250 ml)');
+    }
+  }
+
+  Future<void> _notification(String payload, String? action) async {
+    final i = payload.indexOf(':');
+    final kind = i < 0 ? payload : payload.substring(0, i);
+    final arg = i < 0 ? '' : payload.substring(i + 1);
+    switch (kind) {
+      case 'gut':
+        final date = arg.isEmpty ? todayIso() : arg;
+        final c = switch (action) { 'g5' => 5, 'g3' => 3, 'g1' => 1, _ => 0 };
+        if (c > 0) {
+          await app.saveGut(GutEntry(id: newId('g'), person: app.active.id, date: date, when: 'rano', comfort: c));
+          if (mounted) toast(context, c >= 4 ? 'Zapisano: trawienie dobrze' : 'Zapisano. Dodaj objawy, jeśli chcesz – stuknij wpis.');
+        } else {
+          _push(GutForm(date: date, when: 'rano'));
+        }
+      case 'reaction':
+        final m = app.allMeals.where((m) => m.id == arg).firstOrNull;
+        if (m != null && mounted) await showReactionSheet(context, m);
+      case 'meal':
+        _push(MealForm(date: todayIso(), initialType: arg.isEmpty ? null : arg));
+      case 'week':
+        _push(const WeekScreen());
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: app,
@@ -40,6 +110,11 @@ class _HomeScreenState extends State<HomeScreen> {
               setState(() => tab = 2);
             }),
             actions: [
+              IconButton(
+                tooltip: 'Więcej: przepisy, waga, tydzień, spiżarnia, raport',
+                icon: const Icon(Icons.apps),
+                onPressed: () => showToolsSheet(context, day),
+              ),
               IconButton(
                 tooltip: 'Ustawienia',
                 icon: const Icon(Icons.settings_outlined),
@@ -172,8 +247,11 @@ class JournalTab extends StatelessWidget {
             ),
           ),
         ),
+      QuickAddCard(day: day),
       _BudgetCard(day: day),
       _GutCard(day: day),
+      DrinksCard(day: day),
+      MedsCard(day: day),
       SectionTitle('Posiłki · ${meals.length}'),
       if (meals.isEmpty)
         Padding(
@@ -199,7 +277,12 @@ class _BudgetCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = dayTotal(app.meals, day);
-    final goal = app.goal;
+    final act = HealthSync.activityFor(app.active.id, day);
+    final bonus = HealthSync.goalBonus(app.active.id, day);
+    final goal = app.goal + bonus;
+    final dayMeals = app.mealsOn(day);
+    final mi = Micro.ofItems(dayMeals.expand((m) => m.items));
+    final win = eatingWindow(dayMeals, day);
     final left = goal - t.kcal;
     final pt = proteinOf(app.active);
     final cs = Theme.of(context).colorScheme;
@@ -243,11 +326,22 @@ class _BudgetCard extends StatelessWidget {
               const SizedBox(height: 8),
               Row(children: [
                 macro('Tłuszcz', '${t.f.round()} g'),
-                const Expanded(child: SizedBox()),
+                mi.coverage >= 0.3 ? macro('Błonnik', '${mi.fiber.round()} / 25 g') : const Expanded(child: SizedBox()),
               ]),
             ]),
           ),
         ]),
+        if (mi.coverage >= 0.3 || win != null || act != null) ...[
+          const SizedBox(height: 10),
+          Text(
+            [
+              if (mi.coverage >= 0.3) 'cukry ${mi.sugar.round()} g · sól ${mi.salt.toStringAsFixed(1).replaceAll('.', ',')} g${mi.salt > 5 ? ' (powyżej 5 g)' : ''}',
+              if (win != null) win.first == win.last ? 'jedzenie od ${hm(win.first)}' : 'okno ${hm(win.first)}–${hm(win.last)}',
+              if (act != null) '${act.$1} kroków${bonus > 0 ? ' · +$bonus kcal do celu' : ''}',
+            ].join(' · '),
+            style: TextStyle(fontSize: 12.5, color: mi.salt > 5 ? Palette.amber(context) : cs.onSurfaceVariant),
+          ),
+        ],
       ]),
     );
   }

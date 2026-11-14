@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:background="@drawable/widget_bg">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="bottom">
+        <TextView
+            android:id="@+id/w_kcal"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="–"
+            android:textSize="26sp"
+            android:textStyle="bold"
+            android:textColor="#FF2B2118" />
+        <TextView
+            android:id="@+id/w_goal"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:paddingBottom="3dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textSize="13sp"
+            android:textColor="#FF6E625A" />
+        <TextView
+            android:id="@+id/w_person"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingBottom="3dp"
+            android:maxLines="1"
+            android:textSize="12sp"
+            android:textColor="#FF6E625A" />
+    </LinearLayout>
+
+    <ProgressBar
+        android:id="@+id/w_progress"
+        style="@android:style/Widget.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="6dp"
+        android:layout_marginTop="6dp"
+        android:max="100"
+        android:progressTint="#FFC26A12" />
+
+    <TextView
+        android:id="@+id/w_water"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textSize="12sp"
+        android:textColor="#FF6E625A" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+        <TextView
+            android:id="@+id/w_meal"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="36dp"
+            android:gravity="center"
+            android:background="@drawable/widget_btn"
+            android:text="+ Posiłek"
+            android:textStyle="bold"
+            android:textSize="13sp"
+            android:textColor="#FFFFFFFF" />
+        <TextView
+            android:id="@+id/w_add_water"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="36dp"
+            android:layout_marginStart="6dp"
+            android:gravity="center"
+            android:background="@drawable/widget_btn2"
+            android:text="+ Woda"
+            android:textSize="13sp"
+            android:textColor="#FF2B2118" />
+        <TextView
+            android:id="@+id/w_gut"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="36dp"
+            android:layout_marginStart="6dp"
+            android:gravity="center"
+            android:background="@drawable/widget_btn2"
+            android:text="Trawienie"
+            android:textSize="13sp"
+            android:textColor="#FF2B2118" />
+    </LinearLayout>
+</LinearLayout>

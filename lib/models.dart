@@ -110,7 +110,10 @@ class Person {
 class FoodItem {
   String name;
   double grams, kcal, protein, carbs, fat;
-  FoodItem({this.name = '', this.grams = 0, this.kcal = 0, this.protein = 0, this.carbs = 0, this.fat = 0});
+  double? fiber, sugar, salt; // g; null = brak danych
+  FoodItem({this.name = '', this.grams = 0, this.kcal = 0, this.protein = 0, this.carbs = 0, this.fat = 0, this.fiber, this.sugar, this.salt});
+
+  static double? _opt(dynamic v) => v == null ? null : _d(v);
 
   factory FoodItem.fromJson(Map<String, dynamic> j) => FoodItem(
         name: _s(j['name']).trim(),
@@ -119,7 +122,12 @@ class FoodItem {
         protein: _d(j['protein']),
         carbs: _d(j['carbs']),
         fat: _d(j['fat']),
+        fiber: _opt(j['fiber']),
+        sugar: _opt(j['sugar']),
+        salt: _opt(j['salt']),
       );
+
+  static double _r1(double v) => (v * 10).round() / 10;
 
   Map<String, dynamic> toJson() => {
         'name': name,
@@ -128,7 +136,30 @@ class FoodItem {
         'protein': protein.round(),
         'carbs': carbs.round(),
         'fat': fat.round(),
+        if (fiber != null) 'fiber': _r1(fiber!),
+        if (sugar != null) 'sugar': _r1(sugar!),
+        if (salt != null) 'salt': ((salt! * 100).round() / 100),
       };
+
+  FoodItem copy() => FoodItem.fromJson(toJson());
+}
+
+/// Błonnik, cukry i sól – z pokryciem: jaka część kalorii ma te dane (z tabeli / bazy produktów).
+class Micro {
+  final double fiber, sugar, salt;
+  final double coverage; // 0–1: udział kcal ze składników z danymi
+  const Micro(this.fiber, this.sugar, this.salt, this.coverage);
+  static Micro ofItems(Iterable<FoodItem> items) {
+    var f = 0.0, s = 0.0, sa = 0.0, kAll = 0.0, kKnown = 0.0;
+    for (final i in items) {
+      kAll += i.kcal;
+      if (i.fiber != null || i.sugar != null || i.salt != null) kKnown += i.kcal;
+      f += i.fiber ?? 0;
+      s += i.sugar ?? 0;
+      sa += i.salt ?? 0;
+    }
+    return Micro(f, s, sa, kAll <= 0 ? 0 : (kKnown / kAll).clamp(0, 1).toDouble());
+  }
 }
 
 class Macros {

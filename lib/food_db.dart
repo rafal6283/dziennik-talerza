@@ -11,7 +11,9 @@ class Product {
   final String brand;
   final double kcal100, protein100, carbs100, fat100;
   final double? serving; // g na porcję, jeśli podano
-  const Product(this.code, this.name, this.brand, this.kcal100, this.protein100, this.carbs100, this.fat100, this.serving);
+  final double? fiber100, sugar100, salt100;
+  const Product(this.code, this.name, this.brand, this.kcal100, this.protein100, this.carbs100, this.fat100, this.serving,
+      {this.fiber100, this.sugar100, this.salt100});
 
   String get label => brand.isEmpty ? name : '$name ($brand)';
 }
@@ -42,7 +44,9 @@ class FoodDb {
         .firstWhere((s) => s.isNotEmpty, orElse: () => 'Produkt $code');
     final brand = '${p['brands'] ?? ''}'.split(',').first.trim();
     final serving = _n(p['serving_quantity']);
-    return Product(code, name, brand, kcal, _n(n['proteins_100g']), _n(n['carbohydrates_100g']), _n(n['fat_100g']), serving > 0 ? serving : null);
+    double? opt(String k) => n[k] == null || '${n[k]}'.isEmpty ? null : _n(n[k]);
+    return Product(code, name, brand, kcal, _n(n['proteins_100g']), _n(n['carbohydrates_100g']), _n(n['fat_100g']), serving > 0 ? serving : null,
+        fiber100: opt('fiber_100g'), sugar100: opt('sugars_100g'), salt100: opt('salt_100g'));
   }
 
   static Future<Product?> byBarcode(String code) async {
