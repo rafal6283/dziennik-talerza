@@ -44,7 +44,7 @@ void main() {
     ], pantry: [
       PantryItem(id: 'p', name: 'Skyr naturalny', kcal: 63, protein: 11),
     ]);
-    expect(idx.search('zupa krem').first.tag, 'przepis');
+    expect(idx.search('zupa krem z dyni').first.tag, 'przepis');
     expect(idx.search('skyr').first.tag, 'spiżarnia');
   });
 
