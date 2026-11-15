@@ -750,7 +750,8 @@ class FoodIndex {
     final qStems = qWords.map(stemFood).toList();
     final scored = <(FoodRef, int)>[
       for (final r in refs)
-        if (_score(r, q, qWords, qStems) case final s when s > 0) (r, s)
+        // przepisy i spiżarnia wyżej niż ogólna tabela przy podobnym dopasowaniu
+        if (_score(r, q, qWords, qStems) case final s when s > 0) (r, r.tag.isNotEmpty ? s + 25 : s)
     ]..sort((a, b) => b.$2 != a.$2 ? b.$2.compareTo(a.$2) : a.$1.display.length.compareTo(b.$1.display.length));
     return scored.take(limit).map((e) => e.$1).toList();
   }
