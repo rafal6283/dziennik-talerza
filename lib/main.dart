@@ -72,7 +72,7 @@ void scheduleSideEffects() {
     final p = app.active;
     await HomeWidget.update(
       person: app.people.length > 1 ? p.name : '',
-      kcal: dayTotal(app.meals, today).kcal.round(),
+      kcal: dayTotalAll(app.meals, app.drinks, today).kcal.round(),
       goal: app.goal + HealthSync.goalBonus(p.id, today),
       waterMl: drinksOn(today, app.drinks, const []).waterMl,
       waterGoal: waterGoalMl(p),

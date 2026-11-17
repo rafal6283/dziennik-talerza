@@ -398,9 +398,10 @@ Odpowiedz wyłącznie JSON-em: {"energy":3,"satiety":4,"symptoms":["senność"],
     }
     final days = {for (final d in drinks) if (d.date.compareTo(since) >= 0) d.date}.toList()..sort();
     if (days.isNotEmpty) {
-      out.add('Napoje poza posiłkami (dziennie):\n${days.map((d) {
+      out.add('Napoje poza posiłkami (dziennie; alkohol, kawa i słodzone napoje mogą wpływać na trawienie):\n${days.map((d) {
         final x = drinksOn(d, drinks, const []);
-        return '$d: woda ${x.waterMl} ml, wszystkie ${x.allMl} ml, kawy ${x.coffees}';
+        final names = drinks.where((y) => y.date == d && y.kind != 'woda').map((y) => '${y.label} ${y.ml} ml').join(', ');
+        return '$d: woda ${x.waterMl} ml, wszystkie ${x.allMl} ml, kawy ${x.coffees}${x.alcoholG > 0 ? ', alkohol ${x.alcoholG.round()} g' : ''}${names.isNotEmpty ? ' ($names)' : ''}';
       }).join('\n')}');
     }
     final sl = sleep.entries.where((e) => e.key.compareTo(since) >= 0).toList()..sort((a, b) => a.key.compareTo(b.key));

@@ -251,6 +251,7 @@ class JournalTab extends StatelessWidget {
       _BudgetCard(day: day),
       _GutCard(day: day),
       DrinksCard(day: day),
+      SweetsCard(day: day),
       MedsCard(day: day),
       SectionTitle('Posiłki · ${meals.length}'),
       if (meals.isEmpty)
@@ -276,7 +277,7 @@ class _BudgetCard extends StatelessWidget {
   const _BudgetCard({required this.day});
   @override
   Widget build(BuildContext context) {
-    final t = dayTotal(app.meals, day);
+    final t = dayTotalAll(app.meals, app.drinks, day);
     final act = HealthSync.activityFor(app.active.id, day);
     final bonus = HealthSync.goalBonus(app.active.id, day);
     final goal = app.goal + bonus;

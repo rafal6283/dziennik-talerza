@@ -84,6 +84,16 @@ class QuickAddCard extends StatelessWidget {
 
 // ======================= NAPOJE =======================
 
+IconData _drinkIcon(String kind) => switch (kind) {
+      'woda' => Icons.water_drop_outlined,
+      'kawa' || 'kawa_mleko' => Icons.coffee_outlined,
+      'herbata' || 'ziolowa' => Icons.emoji_food_beverage_outlined,
+      'piwo' || 'piwo0' || 'cydr' => Icons.sports_bar_outlined,
+      'wino' || 'wino_slodkie' => Icons.wine_bar_outlined,
+      'mocny' || 'drink' => Icons.local_bar_outlined,
+      _ => Icons.local_drink_outlined,
+    };
+
 class DrinksCard extends StatelessWidget {
   final String day;
   const DrinksCard({super.key, required this.day});
@@ -96,10 +106,21 @@ class DrinksCard extends StatelessWidget {
     final goal = waterGoalMl(p);
     final cs = Theme.of(context).colorScheme;
 
-    Future<void> add(String kind, int ml) async {
-      final d = Drink(id: newId('d'), person: p.id, date: day, time: day == todayIso() ? _now() : '12:00', kind: kind, ml: ml);
+    Future<void> add(String kind, [int? ml]) async {
+      final k = drinkKind(kind);
+      final d = Drink(id: newId('d'), person: p.id, date: day, time: day == todayIso() ? _now() : '12:00', kind: kind, ml: ml ?? k.ml);
       await app.saveDrink(d);
-      if (context.mounted) _undoToast(context, '${drinkKinds.firstWhere((k) => k.$1 == kind).$2} $ml ml', () => app.deleteDrink(d.id));
+      if (context.mounted) {
+        _undoToast(context, '${k.label} ${d.ml} ml${d.kcal >= 1 ? ' · ${d.kcal.round()} kcal' : ''} – stuknij wpis, żeby zmienić', () => app.deleteDrink(d.id));
+      }
+    }
+
+    // ostatnio używane rodzaje (poza wodą/kawą/herbatą) jako szybkie przyciski
+    final recent = <String>[];
+    for (final d in [...app.drinks]..sort((a, b) => b.ts.compareTo(a.ts))) {
+      if (const {'woda', 'kawa', 'herbata'}.contains(d.kind) || recent.contains(d.kind)) continue;
+      recent.add(d.kind);
+      if (recent.length == 2) break;
     }
 
     return Panel(
@@ -114,9 +135,11 @@ class DrinksCard extends StatelessWidget {
         Wrap(spacing: 6, runSpacing: 6, children: [
           FilledButton.tonalIcon(onPressed: () => add('woda', 250), icon: const Icon(Icons.water_drop_outlined, size: 18), label: const Text('Szklanka')),
           OutlinedButton(onPressed: () => add('woda', 500), child: const Text('0,5 l')),
-          OutlinedButton.icon(onPressed: () => add('kawa', 150), icon: const Icon(Icons.coffee_outlined, size: 18), label: const Text('Kawa')),
-          OutlinedButton.icon(onPressed: () => add('herbata', 250), icon: const Icon(Icons.emoji_food_beverage_outlined, size: 18), label: const Text('Herbata')),
-          OutlinedButton(onPressed: () => _customDrink(context, day), child: const Text('Inny…')),
+          OutlinedButton.icon(onPressed: () => add('kawa'), icon: const Icon(Icons.coffee_outlined, size: 18), label: const Text('Kawa')),
+          OutlinedButton.icon(onPressed: () => add('herbata'), icon: const Icon(Icons.emoji_food_beverage_outlined, size: 18), label: const Text('Herbata')),
+          for (final k in recent)
+            OutlinedButton.icon(onPressed: () => add(k), icon: Icon(_drinkIcon(k), size: 18), label: Text(drinkKind(k).label)),
+          OutlinedButton(onPressed: () => editDrink(context, day), child: const Text('Inny…')),
         ]),
         if (s.coffees > 0 || list.isNotEmpty)
           Padding(
@@ -124,9 +147,11 @@ class DrinksCard extends StatelessWidget {
             child: Text(
               [
                 if (s.coffees > 0) 'kawy: ${s.coffees}${s.coffees >= 4 ? ' – sporo, kofeina może nasilać dolegliwości jelitowe' : ''}',
-                if (list.isNotEmpty) 'wszystkie płyny ${_l(s.allMl)} l (bez zup i napojów z posiłków)',
+                if (s.kcal >= 1) 'z napojów ${s.kcal.round()} kcal (w bilansie dnia)',
+                if (s.alcoholG > 0) 'alkohol ${s.alcoholG.round()} g (${(s.alcoholG / 10).toStringAsFixed(1).replaceAll('.', ',')} porcji standardowych)',
+                if (list.isNotEmpty) 'wszystkie płyny ${_l(s.allMl)} l',
               ].join(' · '),
-              style: TextStyle(color: s.coffees >= 4 ? Palette.amber(context) : cs.onSurfaceVariant, fontSize: 12.5),
+              style: TextStyle(color: s.coffees >= 4 || s.alcoholG >= 20 ? Palette.amber(context) : cs.onSurfaceVariant, fontSize: 12.5),
             ),
           ),
         if (list.isNotEmpty)
@@ -135,8 +160,11 @@ class DrinksCard extends StatelessWidget {
             child: Wrap(spacing: 4, runSpacing: 4, children: [
               for (final d in list)
                 InputChip(
-                  label: Text('${d.time} ${d.kind == 'woda' ? '' : '${d.kind} '}${d.ml} ml', style: const TextStyle(fontSize: 12)),
+                  avatar: Icon(_drinkIcon(d.kind), size: 16),
+                  label: Text('${d.time} ${d.kind == 'woda' && d.name.isEmpty ? '' : '${d.label} '}${d.ml} ml', style: const TextStyle(fontSize: 12)),
                   visualDensity: VisualDensity.compact,
+                  tooltip: 'Stuknij, żeby zmienić',
+                  onPressed: () => editDrink(context, day, d),
                   onDeleted: () => app.deleteDrink(d.id),
                 ),
             ]),
@@ -146,34 +174,301 @@ class DrinksCard extends StatelessWidget {
   }
 }
 
-Future<void> _customDrink(BuildContext context, String day) async {
-  var kind = 'woda';
-  final ml = TextEditingController(text: '250');
-  final ok = await showDialog<bool>(
+/// Dodanie albo edycja napoju: rodzaj, nazwa, ilość, godzina, kcal na 100 ml.
+Future<void> editDrink(BuildContext context, String day, [Drink? e]) async {
+  var kind = e?.kind ?? 'inne';
+  var time = e?.time ?? (day == todayIso() ? _now() : '12:00');
+  var date = e?.date ?? day;
+  final name = TextEditingController(text: e?.name ?? '');
+  final ml = TextEditingController(text: '${e?.ml ?? drinkKind(kind).ml}');
+  final kcal = TextEditingController(text: e?.kcal100 != null ? numInput(e!.kcal100!) : '');
+  const portions = [100, 150, 200, 250, 330, 500];
+
+  final res = await showModalBottomSheet<String>(
     context: context,
-    builder: (c) => StatefulBuilder(
-      builder: (c, set) => AlertDialog(
-        title: const Text('Napój'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          DropdownButtonFormField<String>(
-            value: kind,
-            decoration: const InputDecoration(labelText: 'Rodzaj'),
-            items: [for (final k in drinkKinds) DropdownMenuItem(value: k.$1, child: Text(k.$2))],
-            onChanged: (v) => set(() => kind = v ?? kind),
-          ),
-          const SizedBox(height: 10),
-          TextField(controller: ml, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Ilość (ml)')),
-        ]),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Anuluj')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Dodaj')),
-        ],
-      ),
-    ),
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (c) => StatefulBuilder(builder: (c, set) {
+      final k = drinkKind(kind);
+      final v = parseNum(ml.text) ?? 0;
+      final k100 = parseNum(kcal.text) ?? k.kcal;
+      final cs = Theme.of(c).colorScheme;
+      return Padding(
+        padding: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.of(c).viewInsets.bottom + 16),
+        child: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text(e == null ? 'Napój' : 'Edytuj napój', style: Theme.of(c).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            Wrap(spacing: 6, runSpacing: 6, children: [
+              for (final x in drinkKinds)
+                ChoiceChip(
+                  avatar: Icon(_drinkIcon(x.id), size: 16),
+                  label: Text(x.label),
+                  selected: kind == x.id,
+                  onSelected: (_) => set(() {
+                    // zmiana rodzaju: domyślna porcja, chyba że ilość była już zmieniona
+                    if (e == null && ml.text == '${drinkKind(kind).ml}') ml.text = '${x.ml}';
+                    kind = x.id;
+                    kcal.clear();
+                  }),
+                ),
+            ]),
+            const SizedBox(height: 12),
+            TextField(
+              controller: name,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(labelText: 'Nazwa (opcjonalnie)', hintText: k.isAlcohol ? 'np. Żywiec, prosecco' : 'np. sok jabłkowy'),
+            ),
+            const SizedBox(height: 10),
+            Row(children: [
+              Expanded(
+                child: TextField(
+                  controller: ml,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Ilość (ml)'),
+                  onChanged: (_) => set(() {}),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: kcal,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(labelText: 'kcal / 100 ml', hintText: numInput(k.kcal)),
+                  onChanged: (_) => set(() {}),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 6),
+            Wrap(spacing: 6, children: [
+              for (final p in portions) ActionChip(label: Text('$p'), visualDensity: VisualDensity.compact, onPressed: () => set(() => ml.text = '$p')),
+            ]),
+            const SizedBox(height: 6),
+            Text(
+              [
+                '${(k100 * v / 100).round()} kcal',
+                if (k.sugar > 0) 'cukry ${(k.sugar * v / 100 * (k.kcal > 0 ? k100 / k.kcal : 1)).round()} g',
+                if (k.isAlcohol) 'alkohol ${(k.alcohol * v / 100).round()} g',
+                if (k.hydrating) 'liczy się do wody',
+              ].join(' · '),
+              style: TextStyle(color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(height: 10),
+            Row(children: [
+              OutlinedButton.icon(
+                icon: const Icon(Icons.schedule, size: 18),
+                label: Text(time),
+                onPressed: () async {
+                  final p = time.split(':');
+                  final t = await showTimePicker(context: c, initialTime: TimeOfDay(hour: int.tryParse(p[0]) ?? 12, minute: int.tryParse(p.length > 1 ? p[1] : '0') ?? 0));
+                  if (t != null) set(() => time = '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}');
+                },
+              ),
+              const SizedBox(width: 8),
+              if (e != null)
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.event, size: 18),
+                  label: Text(dayLabel(date)),
+                  onPressed: () async {
+                    final d = await showDatePicker(context: c, initialDate: DateTime.parse('${date}T12:00:00'), firstDate: DateTime(2020), lastDate: DateTime.now());
+                    if (d != null) set(() => date = isoDate(d));
+                  },
+                ),
+            ]),
+            const SizedBox(height: 16),
+            Row(children: [
+              if (e != null) TextButton(onPressed: () => Navigator.pop(c, 'del'), child: Text('Usuń', style: TextStyle(color: cs.error))),
+              const Spacer(),
+              TextButton(onPressed: () => Navigator.pop(c), child: const Text('Anuluj')),
+              const SizedBox(width: 6),
+              FilledButton(onPressed: () => Navigator.pop(c, 'save'), child: Text(e == null ? 'Dodaj' : 'Zapisz')),
+            ]),
+          ]),
+        ),
+      );
+    }),
   );
+  if (res == 'del' && e != null) {
+    await app.deleteDrink(e.id);
+    return;
+  }
   final v = parseNum(ml.text)?.round() ?? 0;
-  if (ok == true && v > 0) {
-    await app.saveDrink(Drink(id: newId('d'), person: app.active.id, date: day, time: day == todayIso() ? _now() : '12:00', kind: kind, ml: v));
+  if (res != 'save' || v <= 0) return;
+  final k100 = parseNum(kcal.text);
+  final d = e ?? Drink(id: newId('d'), person: app.active.id, date: date, time: time);
+  d
+    ..date = date
+    ..time = time
+    ..kind = kind
+    ..ml = v
+    ..name = name.text.trim()
+    ..kcal100 = (k100 != null && (k100 - drinkKind(kind).kcal).abs() > 0.01) ? k100 : null;
+  await app.saveDrink(d);
+}
+
+// ======================= SŁODYCZE =======================
+
+/// Szybkie słodycze: jedna sztuka = jedno stuknięcie. Wartości orientacyjne dla typowej sztuki.
+class Sweet {
+  final String name, unit; // np. „Cukierek”, „szt.”
+  final double grams, kcal, protein, carbs, fat, sugar;
+  final String emoji;
+  const Sweet(this.emoji, this.name, this.unit, this.grams, this.kcal, {this.protein = 0, required this.carbs, required this.fat, required this.sugar});
+
+  FoodItem item(int count) => FoodItem(
+        name: count == 1 ? name.toLowerCase() : '${name.toLowerCase()} ×$count',
+        grams: grams * count,
+        kcal: kcal * count,
+        protein: protein * count,
+        carbs: carbs * count,
+        fat: fat * count,
+        sugar: sugar * count,
+        fiber: 0,
+        salt: 0,
+      );
+}
+
+const sweets = [
+  Sweet('🍬', 'Cukierek', 'szt.', 5, 20, carbs: 4.8, fat: 0.1, sugar: 3.8),
+  Sweet('🍫', 'Cukierek czekoladowy', 'szt.', 10, 52, protein: 0.6, carbs: 6, fat: 2.9, sugar: 5.2),
+  Sweet('🟫', 'Krówka', 'szt.', 8, 33, protein: 0.2, carbs: 6.8, fat: 0.6, sugar: 6),
+  Sweet('🍫', 'Kostka czekolady', 'kostka', 5, 27, protein: 0.4, carbs: 2.9, fat: 1.6, sugar: 2.7),
+  Sweet('🍫', 'Rząd czekolady', '4 kostki', 20, 107, protein: 1.5, carbs: 11.5, fat: 6.2, sugar: 10.5),
+  Sweet('🍪', 'Herbatnik', 'szt.', 6, 27, protein: 0.5, carbs: 4.4, fat: 0.8, sugar: 1.4),
+  Sweet('🍪', 'Ciastko z czekoladą', 'szt.', 13, 64, protein: 0.8, carbs: 8.4, fat: 3, sugar: 4.2),
+  Sweet('🧇', 'Wafelek', 'szt.', 25, 130, protein: 1.5, carbs: 15.5, fat: 7, sugar: 9),
+  Sweet('🍫', 'Batonik', 'szt.', 50, 240, protein: 3, carbs: 30, fat: 12, sugar: 24),
+  Sweet('🐻', 'Żelki', 'garść', 20, 69, protein: 1.3, carbs: 15.5, fat: 0, sugar: 9.5),
+  Sweet('🍩', 'Pączek', 'szt.', 70, 290, protein: 4.5, carbs: 35, fat: 15, sugar: 14),
+  Sweet('🍰', 'Kawałek ciasta', 'szt.', 100, 350, protein: 5, carbs: 45, fat: 17, sugar: 28),
+  Sweet('🍦', 'Gałka lodów', 'gałka', 50, 105, protein: 1.8, carbs: 12, fat: 5.5, sugar: 10.5),
+  Sweet('🍭', 'Lizak', 'szt.', 10, 39, carbs: 9.8, fat: 0, sugar: 8),
+  Sweet('🍪', 'Pierniczek', 'szt.', 10, 38, protein: 0.5, carbs: 7.5, fat: 0.6, sugar: 4),
+  Sweet('🥨', 'Paluszki / chipsy', 'garść', 20, 105, protein: 1.5, carbs: 13, fat: 5, sugar: 0.5),
+];
+
+/// Nazwa posiłku zbierającego słodycze z danego dnia.
+const sweetsMealName = 'Słodycze';
+
+class SweetsCard extends StatelessWidget {
+  final String day;
+  const SweetsCard({super.key, required this.day});
+
+  static final _countRe = RegExp(r' ×(\d+)$');
+
+  static (String, int) _parse(String itemName) {
+    final m = _countRe.firstMatch(itemName);
+    return m == null ? (itemName, 1) : (itemName.substring(0, m.start), int.parse(m.group(1)!));
+  }
+
+  /// Dodaje sztukę: dopisuje do „Słodyczy” z ostatnich 45 minut albo tworzy nową przekąskę.
+  static Future<void> addSweet(BuildContext context, String day, Sweet s) async {
+    final isToday = day == todayIso();
+    final now = DateTime.now();
+    final nowMin = now.hour * 60 + now.minute;
+    Meal? m;
+    for (final x in app.mealsOn(day)) {
+      if (x.name != sweetsMealName) continue;
+      final p = x.time.split(':');
+      final t = (int.tryParse(p[0]) ?? 0) * 60 + (int.tryParse(p.length > 1 ? p[1] : '0') ?? 0);
+      if (!isToday || (nowMin - t).abs() <= 45) m = x;
+    }
+    final key = s.name.toLowerCase();
+    if (m == null) {
+      final created = await app.addMealFrom(name: sweetsMealName, items: [s.item(1)], type: 'Przekąska', date: day, time: isToday ? _now() : '15:00');
+      if (context.mounted) _undoToast(context, '${s.emoji} ${s.name} +${s.kcal.round()} kcal', () => app.deleteMeal(created.id));
+      return;
+    }
+    final meal = m;
+    final idx = meal.items.indexWhere((i) => _parse(i.name).$1 == key);
+    final before = [for (final i in meal.items) i.copy()];
+    var count = 1;
+    if (idx >= 0) {
+      count = _parse(meal.items[idx].name).$2 + 1;
+      meal.items[idx] = s.item(count);
+    } else {
+      meal.items.add(s.item(1));
+    }
+    await app.saveMeal(meal);
+    if (context.mounted) {
+      _undoToast(context, '${s.emoji} ${s.name}${count > 1 ? ' ×$count' : ''} · razem ${meal.total.kcal.round()} kcal', () async {
+        meal.items
+          ..clear()
+          ..addAll(before);
+        await app.saveMeal(meal);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final todays = app.mealsOn(day).where((m) => m.name == sweetsMealName).toList();
+    final counts = <String, int>{};
+    for (final m in todays) {
+      for (final i in m.items) {
+        final (n, c) = _parse(i.name);
+        counts[n] = (counts[n] ?? 0) + c;
+      }
+    }
+    final total = Macros.ofItems(todays.expand((m) => m.items));
+    final sugar = Micro.ofItems(todays.expand((m) => m.items)).sugar;
+    // najczęściej używane na początku
+    final used = <String, int>{};
+    for (final m in app.meals.where((m) => m.name == sweetsMealName)) {
+      for (final i in m.items) {
+        final n = _parse(i.name).$1;
+        used[n] = (used[n] ?? 0) + 1;
+      }
+    }
+    final order = [...sweets]..sort((a, b) => (used[b.name.toLowerCase()] ?? 0).compareTo(used[a.name.toLowerCase()] ?? 0));
+
+    return Panel(
+      padding: const EdgeInsets.fromLTRB(0, 12, 0, 10),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(children: [
+            Expanded(child: Text('Słodycze i przekąski', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700))),
+            if (total.kcal > 0)
+              Text('${total.kcal.round()} kcal · cukry ${sugar.round()} g',
+                  style: TextStyle(color: sugar > 25 ? Palette.amber(context) : cs.onSurfaceVariant, fontFeatures: tabular)),
+          ]),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 40,
+          child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12), children: [
+            for (final s in order)
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: ActionChip(
+                  label: Text('${s.emoji} ${s.name}${(counts[s.name.toLowerCase()] ?? 0) > 0 ? ' ·${counts[s.name.toLowerCase()]}' : ''}'),
+                  tooltip: '${s.unit} ≈ ${s.grams.round()} g, ${s.kcal.round()} kcal',
+                  onPressed: () => addSweet(context, day, s),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: ActionChip(
+                avatar: const Icon(Icons.search, size: 16),
+                label: const Text('Inne…'),
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MealForm(date: day, initialType: 'Przekąska'))),
+              ),
+            ),
+          ]),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+          child: Text(
+            counts.isEmpty
+                ? 'Stuknij raz za każdą sztukę – zapisze się jako przekąska.'
+                : 'Dziś: ${counts.entries.map((e) => '${e.key} ${e.value}').join(', ')}. Pomyłkę poprawisz w posiłku „Słodycze”.',
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12.5),
+          ),
+        ),
+      ]),
+    );
   }
 }
 
@@ -846,7 +1141,7 @@ class SuggestScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final today = todayIso();
-    final t = dayTotal(app.meals, today);
+    final t = dayTotalAll(app.meals, app.drinks, today);
     final goal = app.goal + HealthSync.goalBonus(app.active.id, today);
     final left = goal - t.kcal;
     final pt = proteinOf(app.active);

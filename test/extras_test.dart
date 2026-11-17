@@ -69,6 +69,32 @@ void main() {
     expect(waterGoalMl(Person(id: 'a', name: 'A', weight: 80)), 2500);
   });
 
+  test('napoje z kaloriami i alkoholem wchodzą do bilansu dnia', () {
+    final d = [
+      Drink(id: '1', person: 'me', date: '2026-11-10', time: '19:00', kind: 'piwo', ml: 500),
+      Drink(id: '2', person: 'me', date: '2026-11-10', time: '20:00', kind: 'sok', ml: 200, kcal100: 50, name: 'sok jabłkowy'),
+    ];
+    final s = drinksOn('2026-11-10', d, const []);
+    expect(s.waterMl, 0);
+    expect(s.kcal, closeTo(215 + 100, 0.01));
+    expect(s.alcoholG, closeTo(19.5, 0.01));
+    expect(d[1].label, 'sok jabłkowy');
+    final back = Drink.fromJson(jsonDecode(jsonEncode(d[1].toJson())));
+    expect(back.kcal100, 50);
+    expect(back.name, 'sok jabłkowy');
+    final t = dayTotalAll([meal('m', '2026-11-10', '12:00', 'obiad', kcal: 500)], d, '2026-11-10');
+    expect(t.kcal, closeTo(815, 0.01));
+    expect(drinkKind('nieznany').id, 'inne');
+  });
+
+  test('słodycze: wielokrotność sztuk', () {
+    final c = sweets.firstWhere((s) => s.name == 'Cukierek');
+    final i = c.item(3);
+    expect(i.name, 'cukierek ×3');
+    expect(i.kcal, 60);
+    expect(i.sugar, closeTo(11.4, 0.01));
+  });
+
   test('waga: trend tygodniowy i średnia 7 dni', () {
     final ws = [for (var i = 0; i < 15; i++) WeightEntry(id: '$i', person: 'me', date: shiftDay('2026-11-01', i * 2), kg: 90 - i * 0.2)];
     final t = WeightTrend(ws);

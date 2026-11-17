@@ -82,7 +82,7 @@ Future<Uint8List> buildReport(ReportInput r) async {
     final ms = meals.where((m) => m.date == d).toList();
     final gs = gut.where((g) => g.date == d);
     if (ms.isEmpty && gs.isEmpty) continue;
-    final t = dayTotal(ms, d);
+    final t = dayTotalAll(ms, r.drinks, d);
     final mi = Micro.ofItems(ms.expand((m) => m.items));
     final w = eatingWindow(ms, d);
     final score = gutDayScore(gs);
@@ -108,7 +108,7 @@ Future<Uint8List> buildReport(ReportInput r) async {
   final wt = WeightTrend(r.weights);
   final wIn = r.weights.where((w) => inRange(w.date)).toList();
   final ch = wt.weeklyChange(days: days.length.clamp(14, 120), until: r.to);
-  final kcalDays = [for (final d in days) if (meals.any((m) => m.date == d)) dayTotal(meals, d).kcal];
+  final kcalDays = [for (final d in days) if (meals.any((m) => m.date == d)) dayTotalAll(meals, r.drinks, d).kcal];
 
   final doc = pw.Document(title: 'Dziennik talerza – ${r.person.name}', author: 'Dziennik talerza');
   doc.addPage(pw.MultiPage(

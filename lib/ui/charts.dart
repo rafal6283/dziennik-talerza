@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../calc.dart';
+import '../extras.dart';
 import '../models.dart';
 import 'format.dart';
 
@@ -190,7 +191,8 @@ class KcalChart extends StatefulWidget {
   final List<Meal> meals;
   final int goal;
   final String today;
-  const KcalChart({super.key, required this.meals, required this.goal, required this.today});
+  final List<Drink> drinks;
+  const KcalChart({super.key, required this.meals, required this.goal, required this.today, this.drinks = const []});
 
   @override
   State<KcalChart> createState() => _KcalChartState();
@@ -203,7 +205,7 @@ class _KcalChartState extends State<KcalChart> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final days = [for (var i = span - 1; i >= 0; i--) shiftDay(widget.today, -i)];
-    final totals = [for (final d in days) dayTotal(widget.meals, d)];
+    final totals = [for (final d in days) dayTotalAll(widget.meals, widget.drinks, d)];
     final vals = [for (final t in totals) t.kcal];
     final logged = vals.where((v) => v > 0).toList();
     final avg = logged.isEmpty ? 0.0 : logged.reduce((a, b) => a + b) / logged.length;

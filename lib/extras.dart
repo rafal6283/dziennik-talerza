@@ -90,9 +90,29 @@ class Recipe {
 
 /// Napój poza posiłkami: woda (ml), kawa, herbata.
 class Drink {
-  String id, person, date, time, kind; // kind: woda | kawa | herbata | inne
+  String id, person, date, time, kind; // kind: id z [drinkKinds]
   int ml;
-  Drink({required this.id, required this.person, required this.date, required this.time, this.kind = 'woda', this.ml = 250});
+  double? kcal100; // własna wartość kcal/100 ml (null = domyślna dla rodzaju)
+  String name; // opcjonalna nazwa, np. „Żywiec”, „sok jabłkowy”
+  Drink({required this.id, required this.person, required this.date, required this.time, this.kind = 'woda', this.ml = 250, this.kcal100, this.name = ''});
+
+  DrinkKind get kindInfo => drinkKind(kind);
+  String get label => name.isNotEmpty ? name : kindInfo.label;
+  double get _k => ml / 100.0;
+  double get kcal => (kcal100 ?? kindInfo.kcal) * _k;
+
+  /// Wartości odżywcze napoju; makro skalowane, gdy kcal zmienione ręcznie.
+  Macros get macros {
+    final k = kindInfo;
+    final r = kcal100 != null && k.kcal > 0 ? kcal100! / k.kcal : 1.0;
+    return Macros(kcal, k.protein * _k * r, k.carbs * _k * r, k.fat * _k * r);
+  }
+
+  double get sugar => kindInfo.sugar * _k * (kcal100 != null && kindInfo.kcal > 0 ? kcal100! / kindInfo.kcal : 1.0);
+
+  /// Gramy czystego alkoholu.
+  double get alcohol => kindInfo.alcohol * _k;
+
   factory Drink.fromJson(Map<String, dynamic> j) => Drink(
         id: _s(j['id']).isEmpty ? newId('d') : _s(j['id']),
         person: _s(j['person']).isEmpty ? 'me' : _s(j['person']),
@@ -100,8 +120,19 @@ class Drink {
         time: _s(j['time']).isEmpty ? '12:00' : _s(j['time']),
         kind: _s(j['kind']).isEmpty ? 'woda' : _s(j['kind']),
         ml: _i(j['ml']),
+        kcal100: j['kcal100'] == null ? null : _d(j['kcal100']),
+        name: _s(j['name']),
       );
-  Map<String, dynamic> toJson() => {'id': id, 'person': person, 'date': date, 'time': time, 'kind': kind, 'ml': ml};
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'person': person,
+        'date': date,
+        'time': time,
+        'kind': kind,
+        'ml': ml,
+        if (kcal100 != null) 'kcal100': kcal100,
+        if (name.isNotEmpty) 'name': name,
+      };
   int get ts => DateTime.tryParse('${date}T$time:00')?.millisecondsSinceEpoch ?? 0;
 }
 
@@ -193,18 +224,54 @@ class PantryItem {
 
 // ---------- obliczenia ----------
 
-const drinkKinds = [('woda', 'Woda'), ('kawa', 'Kawa'), ('herbata', 'Herbata'), ('inne', 'Inny napój')];
+/// Rodzaj napoju: wartości na 100 ml (orientacyjne, z tabel), domyślna porcja.
+class DrinkKind {
+  final String id, label;
+  final int ml; // typowa porcja
+  final double kcal, protein, carbs, fat, sugar, alcohol; // na 100 ml; alkohol w gramach
+  final bool hydrating; // liczy się do wody
+  const DrinkKind(this.id, this.label, this.ml, {this.kcal = 0, this.protein = 0, this.carbs = 0, this.fat = 0, this.sugar = 0, this.alcohol = 0, this.hydrating = false});
+  bool get isAlcohol => alcohol > 0;
+}
+
+const drinkKinds = [
+  DrinkKind('woda', 'Woda', 250, hydrating: true),
+  DrinkKind('kawa', 'Kawa czarna', 150, kcal: 2, protein: 0.1),
+  DrinkKind('kawa_mleko', 'Kawa z mlekiem', 250, kcal: 30, protein: 1.6, carbs: 2.4, fat: 1.5, sugar: 2.4),
+  DrinkKind('herbata', 'Herbata', 250, kcal: 1),
+  DrinkKind('ziolowa', 'Napar ziołowy', 250, kcal: 1),
+  DrinkKind('mleko', 'Mleko 2%', 250, kcal: 50, protein: 3.4, carbs: 4.8, fat: 2, sugar: 4.8),
+  DrinkKind('kefir', 'Kefir / maślanka', 250, kcal: 45, protein: 3.4, carbs: 4.5, fat: 1.5, sugar: 4.5),
+  DrinkKind('sok', 'Sok owocowy', 250, kcal: 45, protein: 0.4, carbs: 10.5, sugar: 10),
+  DrinkKind('slodzony', 'Napój słodzony', 330, kcal: 42, carbs: 10.6, sugar: 10.6),
+  DrinkKind('zero', 'Napój zero', 330, kcal: 0.3),
+  DrinkKind('izotonik', 'Izotonik', 500, kcal: 25, carbs: 6, sugar: 6),
+  DrinkKind('piwo', 'Piwo', 500, kcal: 43, protein: 0.5, carbs: 3.6, alcohol: 3.9),
+  DrinkKind('piwo0', 'Piwo bezalkoholowe', 500, kcal: 22, protein: 0.3, carbs: 5, sugar: 2.5),
+  DrinkKind('wino', 'Wino wytrawne', 150, kcal: 83, carbs: 2.6, sugar: 0.6, alcohol: 10.5),
+  DrinkKind('wino_slodkie', 'Wino słodkie', 150, kcal: 110, carbs: 10, sugar: 9, alcohol: 9.5),
+  DrinkKind('cydr', 'Cydr', 330, kcal: 49, carbs: 5, sugar: 4.5, alcohol: 4),
+  DrinkKind('mocny', 'Wódka / mocny alkohol', 40, kcal: 231, alcohol: 33),
+  DrinkKind('drink', 'Drink / koktajl', 200, kcal: 120, carbs: 12, sugar: 11, alcohol: 8),
+  DrinkKind('inne', 'Inny napój', 250),
+];
+
+DrinkKind drinkKind(String id) => drinkKinds.firstWhere((k) => k.id == id, orElse: () => drinkKinds.last);
 const waterGoalMlPerKg = 30; // orientacyjnie 30 ml na kg masy ciała
 
 int waterGoalMl(Person p) => p.weight > 0 ? ((p.weight * waterGoalMlPerKg) / 250).round() * 250 : 2000;
 
 /// Płyny dnia: woda i napoje z dziennika napojów (ml) oraz liczba kaw (z napojów i z posiłków).
-({int waterMl, int allMl, int coffees}) drinksOn(String date, Iterable<Drink> drinks, Iterable<Meal> meals) {
+({int waterMl, int allMl, int coffees, double kcal, double alcoholG, double sugar}) drinksOn(String date, Iterable<Drink> drinks, Iterable<Meal> meals) {
   var water = 0, all = 0, coffees = 0;
+  var kcal = 0.0, alc = 0.0, sugar = 0.0;
   for (final d in drinks.where((d) => d.date == date)) {
     all += d.ml;
-    if (d.kind == 'woda') water += d.ml;
-    if (d.kind == 'kawa') coffees++;
+    if (d.kindInfo.hydrating) water += d.ml;
+    if (d.kind.startsWith('kawa')) coffees++;
+    kcal += d.kcal;
+    alc += d.alcohol;
+    sugar += d.sugar;
   }
   final coffeeRe = RegExp(r'\b(kaw|cappuccino|latte|espresso|americano|flat white)', caseSensitive: false);
   for (final m in meals.where((m) => m.date == date)) {
@@ -212,8 +279,15 @@ int waterGoalMl(Person p) => p.weight > 0 ? ((p.weight * waterGoalMlPerKg) / 250
       if (coffeeRe.hasMatch(i.name)) coffees++;
     }
   }
-  return (waterMl: water, allMl: all, coffees: coffees);
+  return (waterMl: water, allMl: all, coffees: coffees, kcal: kcal, alcoholG: alc, sugar: sugar);
 }
+
+/// Kalorie i makro napojów danego dnia (doliczane do bilansu dnia).
+Macros drinkMacros(String date, Iterable<Drink> drinks) =>
+    drinks.where((d) => d.date == date).fold(Macros.zero, (a, d) => a + d.macros);
+
+/// Bilans dnia: posiłki + napoje.
+Macros dayTotalAll(Iterable<Meal> meals, Iterable<Drink> drinks, String date) => dayTotal(meals, date) + drinkMacros(date, drinks);
 
 /// Waga: średnia krocząca z 7 dni (mniej skacze niż pojedyncze pomiary) i zmiana tygodniowa.
 class WeightTrend {
@@ -319,7 +393,11 @@ class WeekSummary {
   final double? weightChange;
   final int? avgFirst, avgLast;
   final int symptomsCount;
+  final double alcoholG; // suma czystego alkoholu w tygodniu
+  final int alcoholDays;
   const WeekSummary({
+    this.alcoholG = 0,
+    this.alcoholDays = 0,
     required this.from,
     required this.until,
     required this.daysLogged,
@@ -352,8 +430,9 @@ WeekSummary weekSummary({
   bool inWeek(String d) => d.compareTo(from) >= 0 && d.compareTo(end) <= 0;
   final days = [for (var i = 0; i < 7; i++) shiftDay(from, i)];
   final logged = days.where((d) => meals.any((m) => m.date == d)).toList();
-  final kcal = [for (final d in logged) dayTotal(meals, d).kcal];
-  final prot = [for (final d in logged) dayTotal(meals, d).p];
+  final kcal = [for (final d in logged) dayTotalAll(meals, drinks, d).kcal];
+  final prot = [for (final d in logged) dayTotalAll(meals, drinks, d).p];
+  final alc = [for (final d in days) drinksOn(d, drinks, const []).alcoholG];
   final fib = [
     for (final d in logged)
       if (Micro.ofItems(meals.where((m) => m.date == d).expand((m) => m.items)) case final mi when mi.coverage >= 0.5) mi.fiber
@@ -376,6 +455,8 @@ WeekSummary weekSummary({
   final windows = [for (final d in logged) eatingWindow(meals, d)].whereType<({int first, int last})>().toList();
   final wt = WeightTrend(weights.where((w) => inWeek(w.date) || w.date.compareTo(shiftDay(from, -21)) >= 0));
   return WeekSummary(
+    alcoholG: alc.fold(0.0, (a, b) => a + b),
+    alcoholDays: alc.where((a) => a > 0).length,
     from: from,
     until: end,
     daysLogged: logged.length,

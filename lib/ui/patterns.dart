@@ -86,7 +86,7 @@ class _PatternsTabState extends State<PatternsTab> {
       Panel(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           title('Kalorie dzień po dniu'),
-          KcalChart(meals: meals, goal: goal, today: today),
+          KcalChart(meals: meals, goal: goal, today: today, drinks: app.drinks),
           const SizedBox(height: 6),
           muted('Zielona linia to cel tej osoby: $goal kcal. Dotknij słupka albo przesuń palcem, żeby zobaczyć dzień.'),
         ]),
