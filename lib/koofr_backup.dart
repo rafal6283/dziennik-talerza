@@ -69,7 +69,7 @@ class DziennikExchange extends ExchangeAdapter {
   static const _kCounter = 'ex_kreska_counter';
 
   @override
-  String? get publishes => 'Posiłki dnia (alkohol, kawa, pora kolacji, kalorie) – dla Polar EKG, który szuka, co poprzedza napady AF';
+  String? get publishes => 'Posiłki dnia (alkohol, kawa i ich pory, pora kolacji, kalorie) – dla Polar EKG (co poprzedza napady AF), Rytmu Snu (co wpływa na sen), Formy i Doby';
 
   @override
   Future<Map<String, List<int>?>> export() async =>

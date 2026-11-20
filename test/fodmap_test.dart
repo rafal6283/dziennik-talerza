@@ -45,7 +45,10 @@ void main() {
     expect(days.length, 2);
     final d1 = days.first as Map;
     expect((d1['alcohol'], d1['coffee'], d1['last_meal_h']), (1, 1, 21.5));
+    // pory kawy i alkoholu — dla Rytmu Snu (kofeina po 14:00, alkohol wieczorem)
+    expect((d1['coffee_last_h'], d1['alcohol_last_h']), (8.0, 21.5));
     final d2 = days.last as Map;
     expect((d2['alcohol'], d2['coffee']), (0, 0));
+    expect(d2.containsKey('coffee_last_h'), isFalse);
   });
 }

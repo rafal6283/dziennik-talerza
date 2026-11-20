@@ -287,14 +287,20 @@ Map<String, Object?> mealFactors(List<Meal> meals, String person) {
     }
 
     final kcal = l.fold<double>(0, (s, m) => s + m.total.kcal);
+    double? lastOf(Iterable<Meal> x) =>
+        x.isEmpty ? null : double.parse(x.map(hour).reduce((a, b) => a > b ? a : b).toStringAsFixed(2));
+    final alc = l.where(mealHasAlcohol), cof = l.where(mealHasCoffee);
     days.add({
       'date': d,
       'meals': l.length,
       'kcal': kcal.round(),
       'big_meal_kcal': l.map((m) => m.total.kcal).fold<double>(0, (a, b) => a > b ? a : b).round(),
-      'last_meal_h': double.parse(l.map(hour).reduce((a, b) => a > b ? a : b).toStringAsFixed(2)),
-      'alcohol': l.where(mealHasAlcohol).length,
-      'coffee': l.where(mealHasCoffee).length,
+      'last_meal_h': lastOf(l),
+      'eve_kcal': l.where((m) => hour(m) >= 18).fold<double>(0, (s, m) => s + m.total.kcal).round(),
+      'alcohol': alc.length,
+      if (alc.isNotEmpty) 'alcohol_last_h': lastOf(alc),
+      'coffee': cof.length,
+      if (cof.isNotEmpty) 'coffee_last_h': lastOf(cof),
     });
   }
   return {
