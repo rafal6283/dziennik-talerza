@@ -91,6 +91,29 @@ class _PatternsTabState extends State<PatternsTab> {
           muted('Zielona linia to cel tej osoby: $goal kcal. Dotknij słupka albo przesuń palcem, żeby zobaczyć dzień.'),
         ]),
       ),
+      Builder(builder: (context) {
+        // kalorie w kalendarzu: kropka = dzień ponad cel (o > 10%)
+        final byDay = <DateTime, double>{};
+        for (final m in meals) {
+          final d = DateTime.tryParse('${m.date}T00:00:00');
+          if (d != null) byDay[d] = (byDay[d] ?? 0) + m.total.kcal;
+        }
+        if (byDay.length < 3) return const SizedBox.shrink();
+        return Panel(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            title('Kalorie · kalendarz'),
+            CalendarHeatmap(
+              values: byDay,
+              color: Palette.amber(context),
+              weeks: 16,
+              format: (v) => '${v.round()} kcal${goal > 0 ? ' · ${(100 * v / goal).round()}% celu' : ''}',
+              marker: (_, v) => goal > 0 && v > goal * 1.1,
+            ),
+            const SizedBox(height: 6),
+            muted('Im mocniejszy kolor, tym więcej kalorii. Kropka – dzień o ponad 10% powyżej celu. Przesuń palcem po dniach.'),
+          ]),
+        );
+      }),
       if (mt.kcal > 0)
         Panel(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
