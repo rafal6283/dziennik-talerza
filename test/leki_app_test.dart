@@ -33,7 +33,7 @@ void main() {
           'meals': [], 'gut': [], 'meds': meds,
         })));
     app.useDirectory(dir!);
-    await t.binding.setSurfaceSize(const Size(400, 860));
+    await t.binding.setSurfaceSize(const Size(400, 4000));
     await t.pumpWidget(const DziennikApp());
     await t.runAsync(() => Future.delayed(const Duration(seconds: 1)));
     await _settle(t);
