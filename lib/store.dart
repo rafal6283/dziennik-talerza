@@ -59,6 +59,8 @@ class AppState extends ChangeNotifier {
   void useDirectory(Directory d) {
     _dir = d;
     _file = null;
+    _diskHash = null;
+    _knownIds = const {};
   }
 
   Future<File> _dataFile() async => _file ??= File('${(await dir()).path}/dziennik.json');
@@ -89,7 +91,12 @@ class AppState extends ChangeNotifier {
   Future<void> load() async {
     try {
       final f = await _dataFile();
-      if (await f.exists()) _apply(jsonDecode(await f.readAsString()), replace: true);
+      if (await f.exists()) {
+        final text = await f.readAsString();
+        _apply(jsonDecode(text), replace: true);
+        _diskHash = text.hashCode;
+        _knownIds = _ids();
+      }
     } catch (e) {
       debugPrint('load error $e');
     }
@@ -115,11 +122,116 @@ class AppState extends ChangeNotifier {
         if (pantry.isNotEmpty) 'pantry': pantry.map((e) => e.toJson()).toList(),
       };
 
-  Future<void> _save() async {
+  // ---------- zapis bezpieczny dla kilku procesów ----------
+  // Kopia/wymiana Koofr działa w tle w osobnym procesie (izolacie) z własnym obrazem danych. Gdyby zapisywała
+  // plik „na ślepo”, nadpisałaby wpisy dodane w tym czasie w aplikacji (np. leki dodane rano znikały).
+  // Dlatego przed każdym zapisem: jeśli plik zmienił się od naszego ostatniego odczytu/zapisu, dołączamy
+  // z niego wpisy, których nie znamy (nowe z innego procesu); wpisów, które sami usunęliśmy, nie przywracamy.
+
+  int? _diskHash; // skrót treści pliku przy ostatnim odczycie/zapisie przez ten proces
+  Map<String, Set<String>> _knownIds = const {}; // identyfikatory wpisów w tym momencie
+  Future<void> _saveChain = Future.value();
+  bool _noMerge = false; // przywrócenie kopii: plik na dysku jest nieaktualny z definicji
+
+  Map<String, Set<String>> _ids() => {
+        'people': {for (final x in people) x.id},
+        'meals': {for (final x in allMeals) x.id},
+        'gut': {for (final x in allGut) x.id},
+        'gasSources': {for (final x in gasSources) x.id},
+        'eliminations': {for (final x in eliminations) x.id},
+        'favorites': {for (final x in favorites) x.id},
+        'recipes': {for (final x in recipes) x.id},
+        'drinks': {for (final x in allDrinks) x.id},
+        'weights': {for (final x in allWeights) x.id},
+        'meds': {for (final x in allMeds) x.id},
+        'pantry': {for (final x in pantry) x.id},
+      };
+
+  /// Dołącza wpisy zapisane przez inny proces. Zwraca, czy coś się zmieniło.
+  bool _mergeDisk(dynamic j) {
+    if (j is! Map || j['people'] is! List) return false;
+    var changed = false;
+    void add<T>(String key, List<T> into, T Function(Map<String, dynamic>) f, String Function(T) id, {bool preferDisk = false}) {
+      final raw = j[key] is List ? j[key] as List : const []; // puste listy nie trafiają do pliku
+      final known = _knownIds[key] ?? const <String>{};
+      final onDisk = <String>{};
+      for (final e in raw) {
+        if (e is! Map) continue;
+        final T x;
+        try {
+          x = f(Map<String, dynamic>.from(e));
+        } catch (_) {
+          continue;
+        }
+        final k = id(x);
+        onDisk.add(k);
+        final i = into.indexWhere((y) => id(y) == k);
+        if (i >= 0) {
+          if (preferDisk) into[i] = x; // wiatry z Rytmu Snu/Kreski pobiera tylko proces w tle
+          continue;
+        }
+        if (known.contains(k)) continue; // usunięty tutaj
+        into.add(x);
+        changed = true;
+      }
+      // był w pliku przy naszym ostatnim zapisie, a teraz go nie ma → usunięty w innym procesie
+      final before = into.length;
+      into.removeWhere((y) => known.contains(id(y)) && !onDisk.contains(id(y)));
+      if (into.length != before) changed = true;
+    }
+
+    add<Person>('people', people, Person.fromJson, (x) => x.id);
+    add<Meal>('meals', allMeals, Meal.fromJson, (x) => x.id);
+    add<GutEntry>('gut', allGut, GutEntry.fromJson, (x) => x.id);
+    add<GasSource>('gasSources', gasSources, GasSource.fromJson, (x) => x.id, preferDisk: true);
+    add<Elimination>('eliminations', eliminations, Elimination.fromJson, (x) => x.id);
+    add<Favorite>('favorites', favorites, Favorite.fromJson, (x) => x.id);
+    add<Recipe>('recipes', recipes, Recipe.fromJson, (x) => x.id);
+    add<Drink>('drinks', allDrinks, Drink.fromJson, (x) => x.id);
+    add<WeightEntry>('weights', allWeights, WeightEntry.fromJson, (x) => x.id);
+    add<MedEntry>('meds', allMeds, MedEntry.fromJson, (x) => x.id);
+    add<PantryItem>('pantry', pantry, PantryItem.fromJson, (x) => x.id);
+    return changed;
+  }
+
+  /// Po powrocie do aplikacji: dołącz to, co w międzyczasie zapisał proces w tle.
+  Future<void> syncFromDisk() async {
+    await _saveChain;
+    try {
+      final f = await _dataFile();
+      if (!await f.exists()) return;
+      final text = await f.readAsString();
+      if (text.hashCode == _diskHash) return;
+      final changed = _mergeDisk(jsonDecode(text));
+      _diskHash = text.hashCode;
+      _knownIds = _ids();
+      if (changed) await _commit();
+    } catch (e) {
+      debugPrint('sync error $e');
+    }
+  }
+
+  Future<void> _save() {
+    final next = _saveChain.then((_) => _saveNow());
+    _saveChain = next.catchError((_) {});
+    return next;
+  }
+
+  Future<void> _saveNow() async {
     final f = await _dataFile();
+    if (!_noMerge && await f.exists()) {
+      try {
+        final text = await f.readAsString();
+        if (text.hashCode != _diskHash && _mergeDisk(jsonDecode(text))) notifyListeners();
+      } catch (_) {}
+    }
+    _noMerge = false;
+    final out = jsonEncode(toJson());
     final tmp = File('${f.path}.tmp');
-    await tmp.writeAsString(jsonEncode(toJson()), flush: true);
+    await tmp.writeAsString(out, flush: true);
     await tmp.rename(f.path);
+    _diskHash = out.hashCode;
+    _knownIds = _ids();
   }
 
   Future<void> _commit() async {
@@ -239,6 +351,7 @@ class AppState extends ChangeNotifier {
   /// Przywrócenie kopii: zastępuje wszystkie dane (zdjęcia podmienia wcześniej wywołujący).
   Future<ImportSummary> replaceFromBytes(List<int> bytes) async {
     final s = _apply(jsonDecode(utf8.decode(bytes)), replace: true);
+    _noMerge = true;
     await _commit();
     return s;
   }

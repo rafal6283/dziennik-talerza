@@ -482,6 +482,11 @@ class MedsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final list = app.medsOn(day);
     final y = app.medsOn(shiftDay(day, -1));
+    final have = {for (final m in list) m.name.trim().toLowerCase()};
+    final missing = [
+      for (final m in {for (final m in y) m.name.trim().toLowerCase(): m}.values)
+        if (!have.contains(m.name.trim().toLowerCase())) m
+    ];
     final cs = Theme.of(context).colorScheme;
     if (list.isEmpty && y.isEmpty && app.meds.isEmpty) {
       // pierwsze użycie: nie zajmuj miejsca, wystarczy przycisk
@@ -496,17 +501,22 @@ class MedsCard extends StatelessWidget {
     return Panel(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          Expanded(child: Text('Leki i suplementy', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700))),
+          Expanded(child: Text(list.isEmpty ? 'Leki i suplementy' : 'Leki i suplementy · ${list.length}', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700))),
           TextButton.icon(onPressed: () => editMed(context, day), icon: const Icon(Icons.add), label: const Text('Dodaj')),
         ]),
-        if (list.isEmpty && y.isNotEmpty)
-          Align(
-            alignment: Alignment.centerLeft,
+        // wczorajsze leki, których dziś jeszcze nie ma – wszystkie nazwy, bez ucinania
+        if (missing.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
             child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(alignment: Alignment.centerLeft, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
               icon: const Icon(Icons.replay, size: 18),
-              label: Text('Jak wczoraj: ${y.map((m) => m.name).join(', ')}', overflow: TextOverflow.ellipsis),
+              label: Text(
+                '${list.isEmpty ? 'Jak wczoraj' : 'Brakujące z wczoraj'} (${missing.length}): ${missing.map((m) => m.dose.isEmpty ? m.name : '${m.name} ${m.dose}').join(', ')}',
+                softWrap: true,
+              ),
               onPressed: () async {
-                for (final m in y) {
+                for (final m in missing) {
                   await app.saveMed(MedEntry(id: newId('med'), person: m.person, date: day, time: m.time, name: m.name, dose: m.dose, kind: m.kind));
                 }
               },

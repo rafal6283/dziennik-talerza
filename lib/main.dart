@@ -164,6 +164,7 @@ class _LockGateState extends State<LockGate> with WidgetsBindingObserver {
     if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) pausedAt ??= DateTime.now();
     if (state == AppLifecycleState.resumed) {
       if (app.loaded) {
+        app.syncFromDisk().ignore(); // wpisy dopisane w tle (kopia/wymiana Koofr)
         HealthSync.refreshActivity().then((_) {
           app.refresh();
           scheduleSideEffects();
