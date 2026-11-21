@@ -9,6 +9,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Zgłoszenie z telefonu: lek dodany przez „Dodaj” nie pojawia się (z historią leków z poprzedniego dnia).
+Future<void> _settle(WidgetTester t) async {
+  for (var i = 0; i < 8; i++) {
+    await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+    await t.pump(const Duration(milliseconds: 100));
+  }
+}
+
 void main() {
   testWidgets('cała aplikacja: Dodaj → Kwas kaprylowy → Zapisz', (t) async {
     SharedPreferences.setMockInitialValues({});
@@ -29,20 +36,20 @@ void main() {
     await t.binding.setSurfaceSize(const Size(400, 860));
     await t.pumpWidget(const DziennikApp());
     await t.runAsync(() => Future.delayed(const Duration(seconds: 1)));
-    await t.pumpAndSettle();
+    await _settle(t);
     final dodaj = find.descendant(of: find.byType(MedsCard), matching: find.text('Dodaj'));
     await t.ensureVisible(dodaj);
-    await t.pumpAndSettle();
+    await _settle(t);
     debugPrint('LEKI: loaded=${app.loaded} meds=${app.medsOn(day).length} texts=${find.byType(Text).evaluate().take(40).map((e) => (e.widget as Text).data).toList()}');
     expect(find.text('Leki i suplementy · 3'), findsOneWidget);
     await t.tap(dodaj);
-    await t.pumpAndSettle();
+    await _settle(t);
     await t.enterText(find.widgetWithText(TextField, 'Nazwa'), 'Kwas kaprylowy');
-    await t.pumpAndSettle();
+    await _settle(t);
     await t.tap(find.text('Zapisz'));
-    await t.pumpAndSettle();
+    await _settle(t);
     await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
-    await t.pumpAndSettle();
+    await _settle(t);
     expect(app.medsOn(day).map((m) => m.name), contains('Kwas kaprylowy'));
     expect(find.text('Leki i suplementy · 4'), findsOneWidget);
     expect(t.takeException(), isNull);
