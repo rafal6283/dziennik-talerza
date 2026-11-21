@@ -56,13 +56,12 @@ void main() {
           'meals': [], 'gut': [], 'meds': meds,
         })));
     app.useDirectory(dir!);
-    await t.binding.setSurfaceSize(const Size(400, 860));
+    await t.binding.setSurfaceSize(const Size(400, 3000));
     await t.pumpWidget(const DziennikApp());
     await t.runAsync(() => Future.delayed(const Duration(seconds: 1)));
     await t.pumpAndSettle();
     final dodaj = find.descendant(of: find.byType(MedsCard), matching: find.text('Dodaj'));
-    await t.scrollUntilVisible(dodaj, 200, scrollable: find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.down).first);
-    await t.pumpAndSettle();
+    debugPrint('LEKI: loaded=${app.loaded} meds=${app.medsOn(day).length} texts=${find.byType(Text).evaluate().take(40).map((e) => (e.widget as Text).data).toList()}');
     expect(find.text('Leki i suplementy · 3'), findsOneWidget);
     await t.tap(dodaj);
     await t.pumpAndSettle();
