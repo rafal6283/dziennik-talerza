@@ -61,7 +61,7 @@ void main() {
     await t.runAsync(() => Future.delayed(const Duration(seconds: 1)));
     await t.pumpAndSettle();
     final dodaj = find.descendant(of: find.byType(MedsCard), matching: find.text('Dodaj'));
-    await t.scrollUntilVisible(dodaj, 200, scrollable: find.byType(Scrollable).first);
+    await t.scrollUntilVisible(dodaj, 200, scrollable: find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.down).first);
     await t.pumpAndSettle();
     expect(find.text('Leki i suplementy · 3'), findsOneWidget);
     await t.tap(dodaj);
