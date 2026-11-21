@@ -610,10 +610,24 @@ Future<void> editMed(BuildContext context, String day, [MedEntry? e]) async {
     ),
   );
   if (res == 'del' && e != null) await app.deleteMed(e.id);
-  if (res == 'save' && name.text.trim().isNotEmpty) {
-    await app.saveMed(MedEntry(
-        id: e?.id ?? newId('med'), person: e?.person ?? app.active.id, date: day, time: time, name: name.text.trim(), dose: dose.text.trim(), kind: kind));
+  if (res != 'save') return;
+  final messenger = context.mounted ? ScaffoldMessenger.maybeOf(context) : null;
+  void say(String msg) => messenger?.showSnackBar(SnackBar(content: Text(msg)));
+  if (name.text.trim().isEmpty) {
+    say('Nie zapisano – brak nazwy.');
+    return;
   }
+  final m = MedEntry(
+      id: e?.id ?? newId('med'), person: e?.person ?? app.active.id, date: day, time: time, name: name.text.trim(), dose: dose.text.trim(), kind: kind);
+  try {
+    await app.saveMed(m);
+  } catch (err) {
+    say('Błąd zapisu „${m.name}”: $err');
+    return;
+  }
+  // potwierdzenie i kontrola: wpis musi być na liście tego dnia
+  final ok = app.medsOn(day).any((x) => x.id == m.id);
+  say(ok ? 'Zapisano: ${m.name} (${m.time})' : 'Zapisano „${m.name}”, ale nie ma go na liście dnia $day (osoba ${m.person}, aktywna ${app.active.id}).');
 }
 
 // ======================= NARZĘDZIA (menu) =======================
