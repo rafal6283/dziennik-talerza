@@ -14,6 +14,7 @@ import 'charts.dart';
 import 'elimination_screen.dart';
 import 'extras_ui.dart';
 import 'format.dart';
+import 'fruit_sheet.dart';
 import 'gut_form.dart';
 import 'meal_form.dart';
 import 'patterns.dart';
@@ -134,11 +135,21 @@ class _HomeScreenState extends State<HomeScreen> {
                   ProfileTab(key: ValueKey(p.id)),
                 ]),
           floatingActionButton: tab == 0 && app.loaded
-              ? FloatingActionButton.extended(
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MealForm(date: day))),
-                  icon: const Icon(Icons.add_a_photo_outlined),
-                  label: const Text('Posiłek'),
-                )
+              ? Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  FloatingActionButton.small(
+                    heroTag: 'owoce',
+                    tooltip: 'Szybko: owoce',
+                    onPressed: () => showFruitSheet(context, day),
+                    child: const Text('🍎', style: TextStyle(fontSize: 20)),
+                  ),
+                  const SizedBox(height: 10),
+                  FloatingActionButton.extended(
+                    heroTag: 'posilek',
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MealForm(date: day))),
+                    icon: const Icon(Icons.add_a_photo_outlined),
+                    label: const Text('Posiłek'),
+                  ),
+                ])
               : null,
           bottomNavigationBar: NavigationBar(
             selectedIndex: tab,
