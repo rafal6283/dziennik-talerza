@@ -115,6 +115,13 @@ boczek|boczek wędzony;460;13;1;45;20;plaster
 salami;430;22;1;38;10;plaster
 kabanos|kabanosy;430;24;2;36;25;kabanos
 pasztet;300;12;6;25;30;porcja
+kaszanka|kiszka;260;9;17;18;100;kawałek
+salceson|salceson włoski;230;15;1;19;20;plaster
+mortadela;280;12;2;25;15;plaster
+kiełbasa krakowska|krakowska;230;20;1.5;16;15;plaster
+kiełbasa biała|biała kiełbasa;280;14;1;25;120;sztuka
+pasztetowa;300;11;4;27;30;porcja
+smalec;900;0;0;100;10;porcja na kromkę
 łosoś pieczony|łosoś;206;22;0;13;120;porcja
 łosoś wędzony;170;21;0;9.5;50;porcja
 dorsz pieczony|dorsz|ryba pieczona;105;23;0;0.9;150;porcja
@@ -300,6 +307,12 @@ makowiec;370;7;50;15;80;kawałek
 faworki|chrust;480;7;55;26;30;porcja
 tiramisu;290;5;28;17;120;porcja
 brownie;450;6;55;23;60;kawałek
+murzynek|ciasto czekoladowe;400;5;55;18;80;kawałek
+tort|tort śmietanowy;330;5;40;17;120;kawałek
+keks;380;5;58;14;60;kawałek
+ciasto z owocami|placek z owocami|ciasto ze śliwkami;260;4;38;10;100;kawałek
+ciasto z kremem|ciasto z galaretką;300;4;35;16;100;kawałek
+rolada biszkoptowa|rolada;330;5;50;12;60;kawałek
 muffinka|muffin;400;5.5;52;19;80;sztuka
 gofr|gofry;290;7;38;12;80;gofr
 gofr z bitą śmietaną;320;5;38;16;150;gofr

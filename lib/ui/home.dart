@@ -14,7 +14,7 @@ import 'charts.dart';
 import 'elimination_screen.dart';
 import 'extras_ui.dart';
 import 'format.dart';
-import 'fruit_sheet.dart';
+import 'quick_sheet.dart';
 import 'gut_form.dart';
 import 'meal_form.dart';
 import 'patterns.dart';
@@ -137,10 +137,10 @@ class _HomeScreenState extends State<HomeScreen> {
           floatingActionButton: tab == 0 && app.loaded
               ? Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, children: [
                   FloatingActionButton.small(
-                    heroTag: 'owoce',
-                    tooltip: 'Szybko: owoce',
-                    onPressed: () => showFruitSheet(context, day),
-                    child: const Text('🍎', style: TextStyle(fontSize: 20)),
+                    heroTag: 'szybko',
+                    tooltip: 'Szybko: owoce, ciasta, kanapki, wędliny',
+                    onPressed: () => showQuickSheet(context, day),
+                    child: const Icon(Icons.bolt),
                   ),
                   const SizedBox(height: 10),
                   FloatingActionButton.extended(
